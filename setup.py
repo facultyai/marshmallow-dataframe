@@ -4,7 +4,7 @@ setup(
     name="marshmallow-numerical",
     description="Marshmallow Schema generator for pandas and numpy",
     license="MIT",
-    url="https://github.com/marshmallow-numerical",
+    url="https://github.com/zblz/marshmallow-numerical",
     author="Víctor Zabalza",
     author_email="vzabalza@gmail.com",
     packages=find_packages("src"),
