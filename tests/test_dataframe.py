@@ -104,7 +104,7 @@ def test_dataframe_field_type_none():
 def test_dataframe_field_wrong_schema_iter(dataframe_field, input_df):
     with pytest.raises(ValidationError) as exception:
         dataframe_field.deserialize(input_df)
-    assert "invalid" in exception.value.messages["_schema"][0].lower()
+    assert "invalid" in exception.value.messages[0]["_schema"][0].lower()
 
 
 def test_dataframe_field_wrong_schema_none(dataframe_field):
@@ -121,19 +121,20 @@ def test_dataframe_field_wrong_schema_notiter(dataframe_field, input_data):
 
 
 def test_get_dataframe_schema(sample_df):
-    validator = get_dataframe_schema(sample_df, orient="records")
+    DataFrameSchema = get_dataframe_schema(sample_df, orient="records")
+    schema = DataFrameSchema()
 
-    assert validator.__class__.__name__ == "RequestDataFrameSchema"
+    assert schema.__class__.__name__ == "RequestDataFrameSchema"
 
-    data_field = validator.fields["data"]
+    data_field = schema.fields["data"]
 
     assert isinstance(data_field, fields.Nested)
     assert isinstance(data_field.schema, BaseRecordsDataFrameSchema)
 
     serialized_df = sample_df.copy()
     serialized_df["datetime"] = serialized_df["datetime"].astype(str)
-    result = validator.load(
+    result = schema.load(
         {"data": serialized_df.to_dict(orient="records")}
-    ).data
+    )
 
     assert_frame_equal(result, sample_df)
