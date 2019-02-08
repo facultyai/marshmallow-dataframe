@@ -15,7 +15,7 @@ DTYPE_TO_FIELD = {
     np.dtype(object): fields.Str(**FIELD_OPTIONS),
     np.dtype(bool): fields.Bool(**FIELD_OPTIONS),
     np.dtype("datetime64[ns]"): fields.DateTime(**FIELD_OPTIONS),
-    pd_dtypes.DatetimeTZDtype('ns', 'UTC'): fields.DateTime(**FIELD_OPTIONS),
+    pd_dtypes.DatetimeTZDtype("ns", "UTC"): fields.DateTime(**FIELD_OPTIONS),
     np.dtype("timedelta64[ns]"): fields.TimeDelta(**FIELD_OPTIONS),
 }
 

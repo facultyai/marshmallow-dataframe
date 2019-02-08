@@ -133,8 +133,6 @@ def test_get_dataframe_schema(sample_df):
 
     serialized_df = sample_df.copy()
     serialized_df["datetime"] = serialized_df["datetime"].astype(str)
-    result = schema.load(
-        {"data": serialized_df.to_dict(orient="records")}
-    )
+    result = schema.load({"data": serialized_df.to_dict(orient="records")})
 
     assert_frame_equal(result, sample_df)
