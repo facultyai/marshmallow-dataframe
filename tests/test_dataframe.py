@@ -120,11 +120,11 @@ def test_dataframe_field_wrong_schema_notiter(dataframe_field, input_data):
         dataframe_field.deserialize(input_data)
 
 
-def test_get_dataframe_schema(sample_df):
+def test_get_dataframe_schema_orient_records(sample_df):
     DataFrameSchema = get_dataframe_schema(sample_df, orient="records")
     schema = DataFrameSchema()
 
-    assert schema.__class__.__name__ == "RequestDataFrameSchema"
+    assert schema.__class__.__name__ == "RequestRecordsDataFrameSchema"
 
     data_field = schema.fields["data"]
 
@@ -134,5 +134,22 @@ def test_get_dataframe_schema(sample_df):
     serialized_df = sample_df.copy()
     serialized_df["datetime"] = serialized_df["datetime"].astype(str)
     result = schema.load({"data": serialized_df.to_dict(orient="records")})
+
+    assert_frame_equal(result, sample_df)
+
+
+def test_get_dataframe_schema_orient_split(sample_df):
+    DataFrameSchema = get_dataframe_schema(sample_df, orient="split")
+    schema = DataFrameSchema()
+
+    assert schema.__class__.__name__ == "RequestSplitDataFrameSchema"
+
+    assert isinstance(schema.fields["data"].container, fields.Tuple)
+    assert isinstance(schema.fields["columns"].container, fields.String)
+    assert isinstance(schema.fields["index"].container, fields.Int)
+
+    serialized_df = sample_df.copy()
+    serialized_df["datetime"] = serialized_df["datetime"].astype(str)
+    result = schema.load(serialized_df.to_dict(orient="split"))
 
     assert_frame_equal(result, sample_df)

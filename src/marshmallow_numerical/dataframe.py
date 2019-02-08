@@ -44,7 +44,7 @@ class BaseSplitDataFrameSchema(Schema):
 
     @post_load(pass_many=True)
     def make_df(self, data, many):
-        raise NotImplementedError
+        return pd.DataFrame(dtype=None, **data)
 
 
 def _create_records_data_field_from_dataframe(df):
@@ -64,7 +64,8 @@ def _create_records_data_field_from_dataframe(df):
 
 
 def _create_data_row_field_from_dataframe(df):
-    raise NotImplementedError
+    tuple_fields = [DTYPE_TO_FIELD[dtype] for dtype in df.dtypes.values]
+    return fields.Tuple(tuple_fields)
 
 
 def get_dataframe_schema(sample_input, orient="split"):
@@ -73,7 +74,7 @@ def get_dataframe_schema(sample_input, orient="split"):
             sample_input
         )
         DataFrameSchema = type(
-            "RequestDataFrameSchema",
+            "RequestRecordsDataFrameSchema",
             (BaseSchema,),
             {"data": records_data_field},
         )
@@ -83,8 +84,9 @@ def get_dataframe_schema(sample_input, orient="split"):
             "RequestSplitDataFrameSchema",
             (BaseSplitDataFrameSchema,),
             {
-                "columns": fields.String(many=True, required=True),
-                "index": fields.String(many=True, required=True),
+                "columns": fields.List(fields.String, required=True),
+                # TODO: index dtype should be inferred from df
+                "index": fields.List(fields.Int, required=True),
                 "data": fields.List(data_row_field, required=True),
             },
         )
