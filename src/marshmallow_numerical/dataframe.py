@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from pandas.core.dtypes import dtypes as pd_dtypes
 from marshmallow import fields, Schema, post_load
 
 from .base import BaseSchema
@@ -14,6 +15,7 @@ DTYPE_TO_FIELD = {
     np.dtype(object): fields.Str(**FIELD_OPTIONS),
     np.dtype(bool): fields.Bool(**FIELD_OPTIONS),
     np.dtype("datetime64[ns]"): fields.DateTime(**FIELD_OPTIONS),
+    pd_dtypes.DatetimeTZDtype('ns', 'UTC'): fields.DateTime(**FIELD_OPTIONS),
     np.dtype("timedelta64[ns]"): fields.TimeDelta(**FIELD_OPTIONS),
 }
 
@@ -45,7 +47,7 @@ class BaseSplitDataFrameSchema(Schema):
         raise NotImplementedError
 
 
-def _create_data_field_from_dataframe(df):
+def _create_records_data_field_from_dataframe(df):
 
     # create marshmallow fields
     input_df_types = {k: v for k, v in zip(df.dtypes.index, df.dtypes.values)}
@@ -67,7 +69,9 @@ def _create_data_row_field_from_dataframe(df):
 
 def get_dataframe_schema(sample_input, orient="split"):
     if orient == "records":
-        records_data_field = _create_data_field_from_dataframe(sample_input)
+        records_data_field = _create_records_data_field_from_dataframe(
+            sample_input
+        )
         DataFrameSchema = type(
             "RequestDataFrameSchema",
             (BaseSchema,),
