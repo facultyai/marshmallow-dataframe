@@ -14,6 +14,6 @@ setup(
         "local_scheme": "dirty-tag",
     },
     setup_requires=["setuptools_scm"],
-    install_requires=["marshmallow>=3.0.0rc3", "pandas", "numpy"],
+    install_requires=["marshmallow==3.0.0rc4", "pandas", "numpy"],
     python_requires=">=3.6",
 )
