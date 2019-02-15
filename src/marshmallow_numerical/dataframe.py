@@ -1,5 +1,7 @@
 import pandas as pd
+import numpy as np
 from marshmallow import fields, Schema, post_load, validate
+from typing import NamedTuple, List, Union
 
 from .base import BaseSchema
 
@@ -16,6 +18,20 @@ DTYPE_KIND_TO_FIELD = {
     "M": fields.DateTime(**_FIELD_OPTIONS),
     "m": fields.TimeDelta(**_FIELD_OPTIONS),
 }
+
+
+class Dtypes(NamedTuple):
+    columns: List[str]
+    dtypes: List[np.dtype]
+
+    @classmethod
+    def from_pandas_dtypes(cls, pd_dtypes: pd.DataFrame) -> "Dtypes":
+        return cls(
+            columns=list(pd_dtypes.index), dtypes=list(pd_dtypes.values)
+        )
+
+    def to_pandas_dtypes(self) -> pd.DataFrame:
+        return pd.DataFrame(index=self.columns, data=self.dtypes)
 
 
 class DtypeToFieldConversionoError(Exception):
@@ -44,8 +60,10 @@ class BaseRecordsDataFrameSchema(Schema):
     def make_df(self, data, many):
         index_data = {i: row for i, row in enumerate(data)}
         return pd.DataFrame.from_dict(
-            index_data, orient="index", columns=self._dtypes.keys().tolist()
-        ).astype(self._dtypes)
+            index_data, orient="index", columns=self._dtypes.columns
+        ).astype(
+            {k: v for k, v in zip(self._dtypes.columns, self._dtypes.dtypes)}
+        )
 
 
 class BaseSplitDataFrameSchema(Schema):
@@ -60,9 +78,9 @@ class BaseSplitDataFrameSchema(Schema):
         return pd.DataFrame(dtype=None, **data)
 
 
-def _create_records_data_field(dtypes):
+def _create_records_data_field(dtypes: Dtypes) -> fields.Field:
     # create marshmallow fields
-    input_df_types = {k: v for k, v in zip(dtypes.index, dtypes.values)}
+    input_df_types = {k: v for k, v in zip(dtypes.columns, dtypes.dtypes)}
     input_fields = {k: _dtype_to_field(v) for k, v in input_df_types.items()}
     input_fields["_dtypes"] = dtypes
 
@@ -75,13 +93,15 @@ def _create_records_data_field(dtypes):
     return fields.Nested(DataFrameSchema, many=True, required=True)
 
 
-def _create_data_row_field(dtypes):
-    tuple_fields = [_dtype_to_field(dtype) for dtype in dtypes.values]
+def _create_data_row_field(dtypes: Dtypes) -> fields.Field:
+    tuple_fields = [_dtype_to_field(dtype) for dtype in dtypes.dtypes]
     return fields.Tuple(tuple_fields)
 
 
-def build_records_schema(dtypes):
+def build_records_schema(dtypes: Union[Dtypes, pd.DataFrame]) -> Schema:
     """Build a records-oriented DataFrame Schema"""
+    if not isinstance(dtypes, Dtypes):
+        dtypes = Dtypes.from_pandas_dtypes(dtypes)
     records_data_field = _create_records_data_field(dtypes)
     return type(
         "RequestRecordsDataFrameSchema",
@@ -90,8 +110,12 @@ def build_records_schema(dtypes):
     )
 
 
-def build_split_schema(dtypes, index_dtype=None):
+def build_split_schema(
+    dtypes: Union[Dtypes, pd.DataFrame], index_dtype: np.dtype = None
+) -> Schema:
     """Build a split-oriented DataFrame Schema"""
+    if not isinstance(dtypes, Dtypes):
+        dtypes = Dtypes.from_pandas_dtypes(dtypes)
     data_row_field = _create_data_row_field(dtypes)
     if index_dtype is None:
         index_field = fields.Raw()
@@ -105,7 +129,7 @@ def build_split_schema(dtypes, index_dtype=None):
             "columns": fields.List(
                 fields.String,
                 required=True,
-                validate=validate.Equal(list(dtypes.index)),
+                validate=validate.Equal(dtypes.columns),
             ),
             "index": fields.List(index_field, required=True),
             "data": fields.List(data_row_field, required=True),
@@ -113,13 +137,16 @@ def build_split_schema(dtypes, index_dtype=None):
     )
 
 
-def get_dataframe_schema(sample_input, orient="split"):
+def get_dataframe_schema(
+    sample_input: pd.DataFrame, orient: str = "split"
+) -> Schema:
     """Build a DataFrame schema from an example dataframe"""
+    dtypes = Dtypes.from_pandas_dtypes(sample_input.dtypes)
     if orient == "records":
-        DataFrameSchema = build_records_schema(sample_input.dtypes)
+        DataFrameSchema = build_records_schema(dtypes)
     elif orient == "split":
         DataFrameSchema = build_split_schema(
-            sample_input.dtypes, index_dtype=sample_input.index.dtype
+            dtypes, index_dtype=sample_input.index.dtype
         )
     else:
         raise ValueError(
