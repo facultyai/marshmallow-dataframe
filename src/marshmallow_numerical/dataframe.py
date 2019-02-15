@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from marshmallow import fields, Schema, post_load
+from marshmallow import fields, Schema, post_load, validate
 
 from .base import BaseSchema
 
@@ -99,7 +99,11 @@ def get_dataframe_schema(sample_input, orient="split"):
             "RequestSplitDataFrameSchema",
             (BaseSplitDataFrameSchema,),
             {
-                "columns": fields.List(fields.String, required=True),
+                "columns": fields.List(
+                    fields.String,
+                    required=True,
+                    validate=validate.Equal(list(sample_input.columns)),
+                ),
                 "index": fields.List(index_field, required=True),
                 "data": fields.List(data_row_field, required=True),
             },

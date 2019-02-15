@@ -181,3 +181,44 @@ def test_get_dataframe_schema_orient_split_str_index(sample_df):
     result = schema.load(_serialize_df(input_df, orient="split"))
 
     assert_frame_equal(result, input_df)
+
+
+def test_get_dataframe_schema_orient_split_missing_column(sample_df):
+
+    DataFrameSchema = get_dataframe_schema(sample_df, orient="split")
+    schema = DataFrameSchema()
+
+    serialized_df = _serialize_df(sample_df, orient="split")
+
+    # delete one column name
+    serialized_df["columns"].pop(0)
+
+    with pytest.raises(ValidationError, match="Must be equal to") as exc:
+        schema.load(serialized_df)
+
+    assert (
+        exc.value.messages["columns"][0]
+        == f"Must be equal to {list(sample_df.columns)}."
+    )
+
+
+def test_get_dataframe_schema_orient_split_swapped_column(sample_df):
+
+    DataFrameSchema = get_dataframe_schema(sample_df, orient="split")
+    schema = DataFrameSchema()
+
+    serialized_df = _serialize_df(sample_df, orient="split")
+
+    # randomly permutate column names in list
+    old_columns = serialized_df["columns"]
+    serialized_df["columns"] = [
+        old_columns[i] for i in np.random.permutation(len(old_columns))
+    ]
+
+    with pytest.raises(ValidationError, match="Must be equal to") as exc:
+        schema.load(serialized_df)
+
+    assert (
+        exc.value.messages["columns"][0]
+        == f"Must be equal to {list(sample_df.columns)}."
+    )
