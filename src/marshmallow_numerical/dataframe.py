@@ -1,23 +1,37 @@
 import pandas as pd
 import numpy as np
-from pandas.core.dtypes import dtypes as pd_dtypes
 from marshmallow import fields, Schema, post_load
 
 from .base import BaseSchema
 
-FIELD_OPTIONS = {"required": True, "allow_none": True}
+_FIELD_OPTIONS = {"required": True, "allow_none": True}
 
 # Integer columns in pandas cannot have null values, so here we allow_none for
 # all types except int
-DTYPE_TO_FIELD = {
-    np.dtype(np.int64): fields.Int(required=True),
-    np.dtype(np.float64): fields.Float(**FIELD_OPTIONS),
-    np.dtype(object): fields.Str(**FIELD_OPTIONS),
-    np.dtype(bool): fields.Bool(**FIELD_OPTIONS),
-    np.dtype("datetime64[ns]"): fields.DateTime(**FIELD_OPTIONS),
-    pd_dtypes.DatetimeTZDtype("ns", "UTC"): fields.DateTime(**FIELD_OPTIONS),
-    np.dtype("timedelta64[ns]"): fields.TimeDelta(**FIELD_OPTIONS),
+DTYPE_KIND_TO_FIELD = {
+    "i": fields.Int(required=True),
+    "u": fields.Int(**_FIELD_OPTIONS),
+    "f": fields.Float(**_FIELD_OPTIONS),
+    "O": fields.Str(**_FIELD_OPTIONS),
+    "b": fields.Bool(**_FIELD_OPTIONS),
+    "M": fields.DateTime(**_FIELD_OPTIONS),
+    "m": fields.TimeDelta(**_FIELD_OPTIONS),
 }
+
+
+class DtypeToFieldConversionoError(Exception):
+    pass
+
+
+def _dtype_to_field(dtype):
+    try:
+        return DTYPE_KIND_TO_FIELD[dtype.kind]
+    except KeyError as exc:
+        raise DtypeToFieldConversionoError(
+            f"The conversion of the dtype {dtype} with kind {dtype.kind} "
+            "into marshmallow fields is unknown. Known kinds are: "
+            f"{DTYPE_KIND_TO_FIELD.keys()}"
+        ) from exc
 
 
 class BaseRecordsDataFrameSchema(Schema):
@@ -51,7 +65,7 @@ def _create_records_data_field_from_dataframe(df):
 
     # create marshmallow fields
     input_df_types = {k: v for k, v in zip(df.dtypes.index, df.dtypes.values)}
-    input_fields = {k: DTYPE_TO_FIELD[v] for k, v in input_df_types.items()}
+    input_fields = {k: _dtype_to_field(v) for k, v in input_df_types.items()}
     input_fields["_dtypes"] = df.dtypes
 
     # create schema dynamically
@@ -64,7 +78,7 @@ def _create_records_data_field_from_dataframe(df):
 
 
 def _create_data_row_field_from_dataframe(df):
-    tuple_fields = [DTYPE_TO_FIELD[dtype] for dtype in df.dtypes.values]
+    tuple_fields = [_dtype_to_field(dtype) for dtype in df.dtypes.values]
     return fields.Tuple(tuple_fields)
 
 
@@ -80,13 +94,13 @@ def get_dataframe_schema(sample_input, orient="split"):
         )
     elif orient == "split":
         data_row_field = _create_data_row_field_from_dataframe(sample_input)
+        index_field = _dtype_to_field(sample_input.index.dtype)
         DataFrameSchema = type(
             "RequestSplitDataFrameSchema",
             (BaseSplitDataFrameSchema,),
             {
                 "columns": fields.List(fields.String, required=True),
-                # TODO: index dtype should be inferred from df
-                "index": fields.List(fields.Int, required=True),
+                "index": fields.List(index_field, required=True),
                 "data": fields.List(data_row_field, required=True),
             },
         )
