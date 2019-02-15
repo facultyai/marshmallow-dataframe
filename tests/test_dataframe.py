@@ -167,3 +167,17 @@ def test_get_dataframe_schema_orient_split(sample_df):
     result = schema.load(_serialize_df(sample_df, orient="split"))
 
     assert_frame_equal(result, sample_df)
+
+
+def test_get_dataframe_schema_orient_split_str_index(sample_df):
+    input_df = sample_df.copy()
+    input_df.index = input_df.index.astype(str)
+
+    DataFrameSchema = get_dataframe_schema(input_df, orient="split")
+    schema = DataFrameSchema()
+
+    assert isinstance(schema.fields["index"].container, fields.String)
+
+    result = schema.load(_serialize_df(input_df, orient="split"))
+
+    assert_frame_equal(result, input_df)
