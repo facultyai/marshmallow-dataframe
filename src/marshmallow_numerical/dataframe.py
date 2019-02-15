@@ -60,12 +60,11 @@ class BaseSplitDataFrameSchema(Schema):
         return pd.DataFrame(dtype=None, **data)
 
 
-def _create_records_data_field_from_dataframe(df):
-
+def _create_records_data_field(dtypes):
     # create marshmallow fields
-    input_df_types = {k: v for k, v in zip(df.dtypes.index, df.dtypes.values)}
+    input_df_types = {k: v for k, v in zip(dtypes.index, dtypes.values)}
     input_fields = {k: _dtype_to_field(v) for k, v in input_df_types.items()}
-    input_fields["_dtypes"] = df.dtypes
+    input_fields["_dtypes"] = dtypes
 
     # create schema dynamically
     DataFrameSchema = type(
@@ -76,36 +75,48 @@ def _create_records_data_field_from_dataframe(df):
     return fields.Nested(DataFrameSchema, many=True, required=True)
 
 
-def _create_data_row_field_from_dataframe(df):
-    tuple_fields = [_dtype_to_field(dtype) for dtype in df.dtypes.values]
+def _create_data_row_field(dtypes):
+    tuple_fields = [_dtype_to_field(dtype) for dtype in dtypes.values]
     return fields.Tuple(tuple_fields)
+
+
+def build_records_schema(dtypes):
+    records_data_field = _create_records_data_field(dtypes)
+    return type(
+        "RequestRecordsDataFrameSchema",
+        (BaseSchema,),
+        {"data": records_data_field},
+    )
+
+
+def build_split_schema(dtypes, index_dtype=None):
+    data_row_field = _create_data_row_field(dtypes)
+    if index_dtype is None:
+        index_field = fields.Raw()
+    else:
+        index_field = _dtype_to_field(index_dtype)
+
+    return type(
+        "RequestSplitDataFrameSchema",
+        (BaseSplitDataFrameSchema,),
+        {
+            "columns": fields.List(
+                fields.String,
+                required=True,
+                validate=validate.Equal(list(dtypes.index)),
+            ),
+            "index": fields.List(index_field, required=True),
+            "data": fields.List(data_row_field, required=True),
+        },
+    )
 
 
 def get_dataframe_schema(sample_input, orient="split"):
     if orient == "records":
-        records_data_field = _create_records_data_field_from_dataframe(
-            sample_input
-        )
-        DataFrameSchema = type(
-            "RequestRecordsDataFrameSchema",
-            (BaseSchema,),
-            {"data": records_data_field},
-        )
+        DataFrameSchema = build_records_schema(sample_input.dtypes)
     elif orient == "split":
-        data_row_field = _create_data_row_field_from_dataframe(sample_input)
-        index_field = _dtype_to_field(sample_input.index.dtype)
-        DataFrameSchema = type(
-            "RequestSplitDataFrameSchema",
-            (BaseSplitDataFrameSchema,),
-            {
-                "columns": fields.List(
-                    fields.String,
-                    required=True,
-                    validate=validate.Equal(list(sample_input.columns)),
-                ),
-                "index": fields.List(index_field, required=True),
-                "data": fields.List(data_row_field, required=True),
-            },
+        DataFrameSchema = build_split_schema(
+            sample_input.dtypes, index_dtype=sample_input.index.dtype
         )
     else:
         raise ValueError(
