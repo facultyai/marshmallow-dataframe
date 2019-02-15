@@ -2,7 +2,9 @@ import numpy as np
 import pandas as pd
 import pytest
 from marshmallow import ValidationError, fields
+from dateutil.tz import tzutc
 from pandas.util.testing import assert_frame_equal
+from pandas.api.types import DatetimeTZDtype
 
 from marshmallow_numerical.dataframe import (
     get_dataframe_schema,
@@ -21,6 +23,14 @@ def sample_df():
             "float": [1.1, 2.2],
             "datetime": ["2018-01-01T12:00:00Z", "2018-01-02T12:00:00Z"],
         }
+    )
+
+    # pd.to_datetime defaults to 'UTC' timezone, whereas datetime objects
+    # deserialized by marshmallow have a 'tzutc()' timezone. They are
+    # functionally equivalent, but fail equality comparison, so here we set the
+    # dtype to the one that marshmallow returns.
+    df["datetime"] = pd.to_datetime(df["datetime"]).astype(
+        DatetimeTZDtype("ns", tzutc())
     )
 
     return df
@@ -119,6 +129,13 @@ def test_dataframe_field_wrong_schema_notiter(dataframe_field, input_data):
         dataframe_field.deserialize(input_data)
 
 
+def _serialize_df(input_df, orient):
+    df = input_df.copy()
+    # convert all datetimes to strings to enforce validation
+    df["datetime"] = df["datetime"].astype(str)
+    return df.to_dict(orient=orient)
+
+
 def test_get_dataframe_schema_orient_records(sample_df):
     DataFrameSchema = get_dataframe_schema(sample_df, orient="records")
     schema = DataFrameSchema()
@@ -130,9 +147,7 @@ def test_get_dataframe_schema_orient_records(sample_df):
     assert isinstance(data_field, fields.Nested)
     assert isinstance(data_field.schema, BaseRecordsDataFrameSchema)
 
-    serialized_df = sample_df.copy()
-    serialized_df["datetime"] = serialized_df["datetime"].astype(str)
-    result = schema.load({"data": serialized_df.to_dict(orient="records")})
+    result = schema.load({"data": _serialize_df(sample_df, orient="records")})
 
     assert_frame_equal(result, sample_df)
 
@@ -145,10 +160,10 @@ def test_get_dataframe_schema_orient_split(sample_df):
 
     assert isinstance(schema.fields["data"].container, fields.Tuple)
     assert isinstance(schema.fields["columns"].container, fields.String)
-    assert isinstance(schema.fields["index"].container, fields.Int)
+    assert isinstance(schema.fields["index"].container, fields.Integer)
 
-    serialized_df = sample_df.copy()
-    serialized_df["datetime"] = serialized_df["datetime"].astype(str)
-    result = schema.load(serialized_df.to_dict(orient="split"))
+    df = sample_df.copy()
+    df["datetime"] = df["datetime"].astype(str)
+    result = schema.load(_serialize_df(sample_df, orient="split"))
 
     assert_frame_equal(result, sample_df)
