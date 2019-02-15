@@ -23,7 +23,6 @@ def sample_df():
         }
     )
 
-    df["datetime"] = pd.to_datetime(df["datetime"])
     return df
 
 
