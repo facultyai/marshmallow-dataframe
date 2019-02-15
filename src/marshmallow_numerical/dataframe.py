@@ -38,7 +38,7 @@ class DtypeToFieldConversionoError(Exception):
     pass
 
 
-def _dtype_to_field(dtype):
+def _dtype_to_field(dtype: np.dtype) -> fields.Field:
     try:
         return DTYPE_KIND_TO_FIELD[dtype.kind]
     except KeyError as exc:
@@ -57,7 +57,7 @@ class BaseRecordsDataFrameSchema(Schema):
         ordered = True
 
     @post_load(pass_many=True)
-    def make_df(self, data, many):
+    def make_df(self, data: dict, many: bool) -> pd.DataFrame:
         index_data = {i: row for i, row in enumerate(data)}
         return pd.DataFrame.from_dict(
             index_data, orient="index", columns=self._dtypes.columns
@@ -74,7 +74,7 @@ class BaseSplitDataFrameSchema(Schema):
         ordered = True
 
     @post_load(pass_many=True)
-    def make_df(self, data, many):
+    def make_df(self, data: dict, many: bool) -> pd.DataFrame:
         return pd.DataFrame(dtype=None, **data)
 
 
