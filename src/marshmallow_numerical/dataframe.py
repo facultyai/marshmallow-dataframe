@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 from marshmallow import fields, Schema, post_load, validate
 
 from .base import BaseSchema
