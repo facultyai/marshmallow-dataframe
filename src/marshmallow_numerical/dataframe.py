@@ -81,6 +81,7 @@ def _create_data_row_field(dtypes):
 
 
 def build_records_schema(dtypes):
+    """Build a records-oriented DataFrame Schema"""
     records_data_field = _create_records_data_field(dtypes)
     return type(
         "RequestRecordsDataFrameSchema",
@@ -90,6 +91,7 @@ def build_records_schema(dtypes):
 
 
 def build_split_schema(dtypes, index_dtype=None):
+    """Build a split-oriented DataFrame Schema"""
     data_row_field = _create_data_row_field(dtypes)
     if index_dtype is None:
         index_field = fields.Raw()
@@ -112,6 +114,7 @@ def build_split_schema(dtypes, index_dtype=None):
 
 
 def get_dataframe_schema(sample_input, orient="split"):
+    """Build a DataFrame schema from an example dataframe"""
     if orient == "records":
         DataFrameSchema = build_records_schema(sample_input.dtypes)
     elif orient == "split":
