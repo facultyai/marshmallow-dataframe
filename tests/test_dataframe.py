@@ -9,6 +9,7 @@ from pandas.api.types import DatetimeTZDtype
 from marshmallow_numerical.dataframe import (
     get_dataframe_schema,
     _create_records_data_field,
+    Dtypes,
     BaseRecordsDataFrameSchema,
 )
 
@@ -38,7 +39,8 @@ def sample_df():
 
 @pytest.fixture
 def dataframe_field(sample_df):
-    test_df_field = _create_records_data_field(sample_df.dtypes)
+    dtypes = Dtypes.from_pandas_dtypes(sample_df.dtypes)
+    test_df_field = _create_records_data_field(dtypes)
     return test_df_field
 
 
@@ -47,7 +49,8 @@ def test_dataframe_field(sample_df):
     sample_df["datetime"] = sample_df["datetime"].astype(str)
     serialized_df = sample_df.to_dict(orient="records")
 
-    records_field = _create_records_data_field(sample_df.dtypes)
+    dtypes = Dtypes.from_pandas_dtypes(sample_df.dtypes)
+    records_field = _create_records_data_field(dtypes)
     output = records_field.deserialize(serialized_df)
 
     assert_frame_equal(output, sample_df)
@@ -96,7 +99,9 @@ def test_dataframe_field_wrong_type(dataframe_field):
 
 def test_dataframe_field_type_none():
     sample_df = pd.DataFrame({"float": [10.2, 10.0]})
-    test_df_field = _create_records_data_field(sample_df.dtypes)
+    test_df_field = _create_records_data_field(
+        Dtypes.from_pandas_dtypes(sample_df.dtypes)
+    )
 
     serialized_df = [{"float": None}, {"float": 42.42}]
     expected_df = pd.DataFrame.from_dict(serialized_df).astype(
