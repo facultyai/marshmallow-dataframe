@@ -7,10 +7,12 @@ from pandas.util.testing import assert_frame_equal
 from pandas.api.types import DatetimeTZDtype
 
 from marshmallow_numerical.dataframe import (
-    get_dataframe_schema,
+    #  get_dataframe_schema,
     _create_records_data_field,
     Dtypes,
-    BaseRecordsDataFrameSchema,
+    #  BaseRecordsDataFrameSchema,
+    SplitDataFrameSchema,
+    RecordsDataFrameSchema,
 )
 
 
@@ -227,3 +229,29 @@ def test_get_dataframe_schema_orient_split_swapped_column(sample_df):
         exc.value.messages["columns"][0]
         == f"Must be equal to {list(sample_df.columns)}."
     )
+
+
+@pytest.mark.parametrize(
+    "base_class", [SplitDataFrameSchema, RecordsDataFrameSchema]
+)
+def test_schema_no_dtypes(base_class):
+    class NewSchema(base_class):
+        pass
+
+    with pytest.raises(
+        NotImplementedError, match="must define the `dtypes` attribute"
+    ):
+        NewSchema()
+
+
+@pytest.mark.parametrize(
+    "base_class", [SplitDataFrameSchema, RecordsDataFrameSchema]
+)
+def test_schema_wrong_dtypes(base_class):
+    class NewSchema(base_class):
+        dtypes = "wrong type for dtypes"
+
+    with pytest.raises(
+        ValueError, match="must be either a pandas DataFrame or"
+    ):
+        NewSchema()
