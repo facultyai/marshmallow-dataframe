@@ -24,7 +24,15 @@ class DtypeToFieldConversionoError(Exception):
 
 def _dtype_to_field(dtype):
     try:
-        return DTYPE_KIND_TO_FIELD[dtype.kind]
+        kind = dtype.kind
+    except AttributeError as exc:
+        raise DtypeToFieldConversionoError(
+            f"The dtype {dtype} does not have a `kind` attribute, "
+            "unable to map dtype into marshmallow field type"
+        ) from exc
+
+    try:
+        return DTYPE_KIND_TO_FIELD[kind]
     except KeyError as exc:
         raise DtypeToFieldConversionoError(
             f"The conversion of the dtype {dtype} with kind {dtype.kind} "
