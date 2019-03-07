@@ -8,7 +8,7 @@ from pandas.api.types import DatetimeTZDtype
 
 from marshmallow_numerical.dataframe import (
     #  get_dataframe_schema,
-    _create_records_data_field,
+    #  _create_records_data_field,
     Dtypes,
     #  BaseRecordsDataFrameSchema,
     SplitDataFrameSchema,

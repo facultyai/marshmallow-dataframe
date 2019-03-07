@@ -1,11 +1,7 @@
-from abc import ABCMeta
-
 import pandas as pd
 import numpy as np
 from marshmallow import fields, Schema, post_load, validate
 from typing import NamedTuple, List, Union, Optional
-
-from .base import BaseSchema
 
 _FIELD_OPTIONS = {"required": True, "allow_none": True}
 
@@ -92,7 +88,19 @@ class RecordsDataFrameSchema(Schema):
     def __init__(self, *args, **kwargs):
 
         dtypes = _validate_dtypes_attribute(self)
-        self.data = _create_records_data_field(dtypes)
+
+        # create marshmallow fields
+        input_df_types = {k: v for k, v in zip(dtypes.columns, dtypes.dtypes)}
+        input_fields = {
+            k: _dtype_to_field(v) for k, v in input_df_types.items()
+        }
+        input_fields["_dtypes"] = dtypes
+
+        # create schema dynamically
+        RecordSchema = type("RecordSchema", (Schema,), input_fields)
+
+        # return nested schema field
+        self.data = fields.Nested(RecordSchema, many=True, required=True)
 
         super().__init__(*args, **kwargs)
 
@@ -102,7 +110,8 @@ class RecordsDataFrameSchema(Schema):
 
     @post_load(pass_many=True)
     def make_df(self, data: dict, many: bool) -> pd.DataFrame:
-        index_data = {i: row for i, row in enumerate(data)}
+        records_data = data.data
+        index_data = {i: row for i, row in enumerate(records_data)}
         return pd.DataFrame.from_dict(
             index_data, orient="index", columns=self._dtypes.columns
         ).astype(
@@ -153,55 +162,3 @@ class SplitDataFrameSchema(Schema):
     @post_load(pass_many=True)
     def make_df(self, data: dict, many: bool) -> pd.DataFrame:
         return pd.DataFrame(dtype=None, **data)
-
-
-def _create_records_data_field(dtypes: Dtypes) -> fields.Field:
-    # create marshmallow fields
-    input_df_types = {k: v for k, v in zip(dtypes.columns, dtypes.dtypes)}
-    input_fields = {k: _dtype_to_field(v) for k, v in input_df_types.items()}
-    input_fields["_dtypes"] = dtypes
-
-    # create schema dynamically
-    DataFrameSchema = type(
-        "DataFrameSchema", (BaseRecordsDataFrameSchema,), input_fields
-    )
-
-    # return nested schema field
-    return fields.Nested(DataFrameSchema, many=True, required=True)
-
-
-def _create_data_row_field(dtypes: Dtypes) -> fields.Field:
-    tuple_fields = [_dtype_to_field(dtype) for dtype in dtypes.dtypes]
-    return fields.Tuple(tuple_fields)
-
-
-def build_records_schema(dtypes: Union[Dtypes, pd.DataFrame]) -> Schema:
-    """Build a records-oriented DataFrame Schema"""
-    if not isinstance(dtypes, Dtypes):
-        dtypes = Dtypes.from_pandas_dtypes(dtypes)
-    records_data_field = _create_records_data_field(dtypes)
-    return type(
-        "RequestRecordsDataFrameSchema",
-        (BaseSchema,),
-        {"data": records_data_field},
-    )
-
-
-#  def get_dataframe_schema(
-#      sample_input: pd.DataFrame, orient: str = "split"
-#  ) -> Schema:
-#      """Build a DataFrame schema from an example dataframe"""
-#      dtypes = Dtypes.from_pandas_dtypes(sample_input.dtypes)
-#      if orient == "records":
-#          DataFrameSchema = build_records_schema(dtypes)
-#      elif orient == "split":
-#          DataFrameSchema = build_split_schema(
-#              dtypes, index_dtype=sample_input.index.dtype
-#          )
-#      else:
-#          raise ValueError(
-#              f"orient={orient} not supported. Only `split` and "
-#              "`records are supported"
-#          )
-#
-#      return DataFrameSchema
