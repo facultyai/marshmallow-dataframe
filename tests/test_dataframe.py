@@ -7,10 +7,7 @@ from pandas.util.testing import assert_frame_equal
 from pandas.api.types import DatetimeTZDtype
 
 from marshmallow_numerical.dataframe import (
-    #  get_dataframe_schema,
-    #  _create_records_data_field,
     Dtypes,
-    #  BaseRecordsDataFrameSchema,
     SplitDataFrameSchema,
     RecordsDataFrameSchema,
 )
@@ -40,20 +37,26 @@ def sample_df():
 
 
 @pytest.fixture
-def dataframe_field(sample_df):
-    dtypes = Dtypes.from_pandas_dtypes(sample_df.dtypes)
-    test_df_field = _create_records_data_field(dtypes)
-    return test_df_field
+def sample_dtypes(sample_df):
+    return Dtypes.from_pandas_dtypes(sample_df.dtypes)
 
 
-def test_dataframe_field(sample_df):
+def test_records_schema(sample_df, sample_dtypes):
+
     sample_df = sample_df.copy()
     sample_df["datetime"] = sample_df["datetime"].astype(str)
-    serialized_df = sample_df.to_dict(orient="records")
+    serialized_df = {"data": sample_df.to_dict(orient="records")}
 
-    dtypes = Dtypes.from_pandas_dtypes(sample_df.dtypes)
-    records_field = _create_records_data_field(dtypes)
-    output = records_field.deserialize(serialized_df)
+    print(serialized_df)
+
+    class MySchema(RecordsDataFrameSchema):
+        dtypes = sample_dtypes
+
+    schema = MySchema()
+
+    print(schema.fields)
+
+    output = schema.load(serialized_df)
 
     assert_frame_equal(output, sample_df)
 
