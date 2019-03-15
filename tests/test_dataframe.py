@@ -67,9 +67,7 @@ def test_schema_wrong_dtypes(base_class):
     class NewSchema(base_class):
         dtypes = "wrong type for dtypes"
 
-    with pytest.raises(
-        ValueError, match="must be either a pandas Series or"
-    ):
+    with pytest.raises(ValueError, match="must be either a pandas Series or"):
         NewSchema()
 
 
@@ -236,7 +234,6 @@ def test_split_schema_str_index(sample_df):
 
 
 def test_split_schema_missing_column(sample_df):
-
     class MySchema(SplitDataFrameSchema):
         dtypes = sample_df.dtypes
         index_dtype = sample_df.index.dtype
@@ -258,7 +255,6 @@ def test_split_schema_missing_column(sample_df):
 
 
 def test_split_schema_swapped_column(sample_df):
-
     class MySchema(SplitDataFrameSchema):
         dtypes = sample_df.dtypes
         index_dtype = sample_df.index.dtype
