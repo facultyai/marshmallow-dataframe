@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
 from marshmallow import fields, Schema, post_load, validate
-from typing import NamedTuple, List, Union
+from typing import NamedTuple, List, Union, Optional, Dict
 
-from .base import BaseSchema
+__all__ = ["Dtypes", "RecordsDataFrameSchema", "SplitDataFrameSchema"]
 
 _FIELD_OPTIONS = {"required": True, "allow_none": True}
 
@@ -57,16 +57,61 @@ def _dtype_to_field(dtype: np.dtype) -> fields.Field:
         ) from exc
 
 
-class BaseRecordsDataFrameSchema(Schema):
-    """Base schema to generate pandas DataFrame from list of records"""
+def _validate_dtypes_attribute(schema: Schema) -> Dtypes:
+    try:
+        dtypes = schema.dtypes
+    except AttributeError as exc:
+        raise NotImplementedError(
+            f"Subclasses of {schema.__class__.__name__} must define the "
+            "`dtypes` attribute"
+        ) from exc
+
+    if isinstance(dtypes, pd.Series):
+        dtypes = Dtypes.from_pandas_dtypes(dtypes)
+    elif not isinstance(dtypes, Dtypes):
+        raise ValueError(
+            "The `dtypes` attribute on subclasses of "
+            f"{schema.__class__.__name__} must be either a pandas Series "
+            "or an instance of marshmallow_numerical.Dtypes"
+        )
+
+    return dtypes
+
+
+class RecordsDataFrameSchema(Schema):
+    """Schema to generate pandas DataFrame from list of records"""
+
+    # Configuration attributes, should be implemented by subclasses
+    dtypes: Union[Dtypes, pd.DataFrame]
+
+    def __init__(self, *args, **kwargs):
+
+        self._dtypes = _validate_dtypes_attribute(self)
+
+        # create marshmallow fields
+        input_fields = {
+            k: _dtype_to_field(v)
+            for k, v in zip(self._dtypes.columns, self._dtypes.dtypes)
+        }
+
+        # create schema dynamically
+        RecordSchema = type("RecordSchema", (Schema,), input_fields)
+
+        df_fields: Dict[str, fields.Field] = {
+            "data": fields.Nested(RecordSchema, many=True, required=True)
+        }
+
+        self._declared_fields.update(df_fields)
+
+        super().__init__(*args, **kwargs)
 
     class Meta:
         strict = True
-        ordered = True
 
-    @post_load(pass_many=True)
-    def make_df(self, data: dict, many: bool) -> pd.DataFrame:
-        index_data = {i: row for i, row in enumerate(data)}
+    @post_load
+    def make_df(self, data: dict) -> pd.DataFrame:
+        records_data = data["data"]
+        index_data = {i: row for i, row in enumerate(records_data)}
         return pd.DataFrame.from_dict(
             index_data, orient="index", columns=self._dtypes.columns
         ).astype(
@@ -74,92 +119,44 @@ class BaseRecordsDataFrameSchema(Schema):
         )
 
 
-class BaseSplitDataFrameSchema(Schema):
-    """Base schema to generate pandas DataFrame from list of records"""
+class SplitDataFrameSchema(Schema):
+    """Schema to generate pandas DataFrame from split oriented JSON"""
+
+    # Configuration attributes, should be implemented by subclasses
+    dtypes: Union[Dtypes, pd.DataFrame]
+    index_dtype: Optional[np.dtype] = None
+
+    def __init__(self, *args, **kwargs):
+        self._dtypes = _validate_dtypes_attribute(self)
+
+        df_fields: Dict[str, fields.Field] = {}
+
+        data_tuple_fields = [
+            _dtype_to_field(dtype) for dtype in self._dtypes.dtypes
+        ]
+        df_fields["data"] = fields.List(fields.Tuple(data_tuple_fields))
+
+        index_field = (
+            fields.Raw()
+            if self.index_dtype is None
+            else _dtype_to_field(self.index_dtype)
+        )
+
+        df_fields["index"] = fields.List(index_field)
+
+        df_fields["columns"] = fields.List(
+            fields.String,
+            required=True,
+            validate=validate.Equal(self._dtypes.columns),
+        )
+
+        self._declared_fields.update(df_fields)
+
+        super().__init__(*args, **kwargs)
 
     class Meta:
         strict = True
-        ordered = True
 
-    @post_load(pass_many=True)
-    def make_df(self, data: dict, many: bool) -> pd.DataFrame:
+    @post_load
+    def make_df(self, data: dict) -> pd.DataFrame:
         return pd.DataFrame(dtype=None, **data)
-
-
-def _create_records_data_field(dtypes: Dtypes) -> fields.Field:
-    # create marshmallow fields
-    input_df_types = {k: v for k, v in zip(dtypes.columns, dtypes.dtypes)}
-    input_fields = {k: _dtype_to_field(v) for k, v in input_df_types.items()}
-    input_fields["_dtypes"] = dtypes
-
-    # create schema dynamically
-    DataFrameSchema = type(
-        "DataFrameSchema", (BaseRecordsDataFrameSchema,), input_fields
-    )
-
-    # return nested schema field
-    return fields.Nested(DataFrameSchema, many=True, required=True)
-
-
-def _create_data_row_field(dtypes: Dtypes) -> fields.Field:
-    tuple_fields = [_dtype_to_field(dtype) for dtype in dtypes.dtypes]
-    return fields.Tuple(tuple_fields)
-
-
-def build_records_schema(dtypes: Union[Dtypes, pd.DataFrame]) -> Schema:
-    """Build a records-oriented DataFrame Schema"""
-    if not isinstance(dtypes, Dtypes):
-        dtypes = Dtypes.from_pandas_dtypes(dtypes)
-    records_data_field = _create_records_data_field(dtypes)
-    return type(
-        "RequestRecordsDataFrameSchema",
-        (BaseSchema,),
-        {"data": records_data_field},
-    )
-
-
-def build_split_schema(
-    dtypes: Union[Dtypes, pd.DataFrame], index_dtype: np.dtype = None
-) -> Schema:
-    """Build a split-oriented DataFrame Schema"""
-    if not isinstance(dtypes, Dtypes):
-        dtypes = Dtypes.from_pandas_dtypes(dtypes)
-    data_row_field = _create_data_row_field(dtypes)
-    if index_dtype is None:
-        index_field = fields.Raw()
-    else:
-        index_field = _dtype_to_field(index_dtype)
-
-    return type(
-        "RequestSplitDataFrameSchema",
-        (BaseSplitDataFrameSchema,),
-        {
-            "columns": fields.List(
-                fields.String,
-                required=True,
-                validate=validate.Equal(dtypes.columns),
-            ),
-            "index": fields.List(index_field, required=True),
-            "data": fields.List(data_row_field, required=True),
-        },
-    )
-
-
-def get_dataframe_schema(
-    sample_input: pd.DataFrame, orient: str = "split"
-) -> Schema:
-    """Build a DataFrame schema from an example dataframe"""
-    dtypes = Dtypes.from_pandas_dtypes(sample_input.dtypes)
-    if orient == "records":
-        DataFrameSchema = build_records_schema(dtypes)
-    elif orient == "split":
-        DataFrameSchema = build_split_schema(
-            dtypes, index_dtype=sample_input.index.dtype
-        )
-    else:
-        raise ValueError(
-            f"orient={orient} not supported. Only `split` and "
-            "`records are supported"
-        )
-
-    return DataFrameSchema

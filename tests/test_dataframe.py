@@ -6,11 +6,10 @@ from dateutil.tz import tzutc
 from pandas.util.testing import assert_frame_equal
 from pandas.api.types import DatetimeTZDtype
 
-from marshmallow_numerical.dataframe import (
-    get_dataframe_schema,
-    _create_records_data_field,
+from marshmallow_numerical import (
     Dtypes,
-    BaseRecordsDataFrameSchema,
+    SplitDataFrameSchema,
+    RecordsDataFrameSchema,
 )
 
 
@@ -37,168 +36,216 @@ def sample_df():
     return df
 
 
-@pytest.fixture
-def dataframe_field(sample_df):
-    dtypes = Dtypes.from_pandas_dtypes(sample_df.dtypes)
-    test_df_field = _create_records_data_field(dtypes)
-    return test_df_field
+def serialize_df(df, orient="split"):
+    test_df = df.copy()
+    if "datetime" in test_df.columns:
+        # convert all datetimes to strings to enforce validation
+        test_df["datetime"] = test_df["datetime"].astype(str)
+    if orient == "records":
+        return {"data": test_df.to_dict(orient="records")}
+    elif orient == "split":
+        return test_df.to_dict(orient="split")
 
 
-def test_dataframe_field(sample_df):
-    sample_df = sample_df.copy()
-    sample_df["datetime"] = sample_df["datetime"].astype(str)
-    serialized_df = sample_df.to_dict(orient="records")
+@pytest.mark.parametrize(
+    "base_class", [SplitDataFrameSchema, RecordsDataFrameSchema]
+)
+def test_schema_no_dtypes(base_class):
+    class NewSchema(base_class):
+        pass
 
-    dtypes = Dtypes.from_pandas_dtypes(sample_df.dtypes)
-    records_field = _create_records_data_field(dtypes)
-    output = records_field.deserialize(serialized_df)
+    with pytest.raises(
+        NotImplementedError, match="must define the `dtypes` attribute"
+    ):
+        NewSchema()
+
+
+@pytest.mark.parametrize(
+    "base_class", [SplitDataFrameSchema, RecordsDataFrameSchema]
+)
+def test_schema_wrong_dtypes(base_class):
+    class NewSchema(base_class):
+        dtypes = "wrong type for dtypes"
+
+    with pytest.raises(ValueError, match="must be either a pandas Series or"):
+        NewSchema()
+
+
+def test_records_schema(sample_df):
+
+    print(type(sample_df.dtypes))
+
+    class MySchema(RecordsDataFrameSchema):
+        dtypes = sample_df.dtypes
+
+    schema = MySchema()
+
+    output = schema.load(serialize_df(sample_df, orient="records"))
 
     assert_frame_equal(output, sample_df)
 
 
-def test_dataframe_field_missing_column(dataframe_field):
-    input_df = [
-        {
-            "int": 1,
-            "boolean": True,
-            "string": "a",
-            "datetime": "2018-01-01T12:00:00Z",
-        }
-    ]
+def test_records_schema_missing_column(sample_df):
+    class MySchema(RecordsDataFrameSchema):
+        dtypes = sample_df.dtypes
+
+    schema = MySchema()
+
+    input_df = serialize_df(sample_df, orient="records")
+
+    # Remove float column from first record
+    input_df["data"][0].pop("float")
+    input_df["data"][1].pop("string")
+
     with pytest.raises(ValidationError) as exception:
-        dataframe_field.deserialize(input_df)
-    assert "missing" in exception.value.messages[0]["float"][0].lower()
+        schema.load(input_df)
 
-
-def test_dataframe_field_two_missing_column(dataframe_field):
-    input_df = [
-        {"int": 1, "boolean": True, "datetime": "2018-01-01T12:00:00Z"}
-    ]
-    with pytest.raises(ValidationError) as exception:
-        dataframe_field.deserialize(input_df)
-    assert "missing" in exception.value.messages[0]["float"][0].lower()
-    assert "missing" in exception.value.messages[0]["string"][0].lower()
-
-
-def test_dataframe_field_wrong_type(dataframe_field):
-    input_df = [
-        {
-            "int": "notint",
-            "boolean": True,
-            "string": "a",
-            "float": 1.1,
-            "datetime": "2018-01-01T12:00:00Z",
-        }
-    ]
-    with pytest.raises(ValidationError) as exception:
-        dataframe_field.deserialize(input_df)
+    assert "missing" in exception.value.messages["data"][0]["float"][0].lower()
     assert (
-        "not a valid integer" in exception.value.messages[0]["int"][0].lower()
+        "missing" in exception.value.messages["data"][1]["string"][0].lower()
     )
 
 
-def test_dataframe_field_type_none():
-    sample_df = pd.DataFrame({"float": [10.2, 10.0]})
-    test_df_field = _create_records_data_field(
-        Dtypes.from_pandas_dtypes(sample_df.dtypes)
+def test_records_schema_wrong_type(sample_df):
+    class MySchema(RecordsDataFrameSchema):
+        dtypes = sample_df.dtypes
+
+    schema = MySchema()
+
+    input_df = serialize_df(sample_df, orient="records")
+
+    # Replace int with string
+    input_df["data"][0]["int"] = "notint"
+
+    with pytest.raises(ValidationError) as exception:
+        schema.load(input_df)
+
+    assert (
+        "not a valid integer"
+        in exception.value.messages["data"][0]["int"][0].lower()
     )
 
-    serialized_df = [{"float": None}, {"float": 42.42}]
-    expected_df = pd.DataFrame.from_dict(serialized_df).astype(
-        sample_df.dtypes
-    )
 
-    output = test_df_field.deserialize(serialized_df)
-    assert_frame_equal(output.isnull(), expected_df.isnull(), check_like=True)
+def test_records_schema_nulls():
+    test_dtypes = pd.Series(index=["float"], data=[np.dtype(np.float)])
+
+    class MySchema(RecordsDataFrameSchema):
+        dtypes = test_dtypes
+
+    schema = MySchema()
+
+    test_df = [{"float": None}, {"float": 42.42}]
+    expected_df = pd.DataFrame.from_dict(test_df).astype(test_dtypes)
+
+    output = schema.load({"data": test_df})
+
+    assert_frame_equal(output, expected_df)
 
 
 @pytest.mark.parametrize(
-    "input_df", [["this is a list of strings"], [1, 2, 3], np.array([1, 2, 3])]
+    "input_data",
+    [["this is a list of strings"], [1, 2, 3], np.array([1, 2, 3])],
 )
-def test_dataframe_field_wrong_schema_iter(dataframe_field, input_df):
+def test_records_schema_invalid_input_type_iter(input_data):
+    class MySchema(RecordsDataFrameSchema):
+        dtypes = Dtypes(columns=["float"], dtypes=[np.dtype(np.float)])
+
+    schema = MySchema()
+
     with pytest.raises(ValidationError) as exception:
-        dataframe_field.deserialize(input_df)
-    assert "invalid" in exception.value.messages[0]["_schema"][0].lower()
-
-
-def test_dataframe_field_wrong_schema_none(dataframe_field):
-    with pytest.raises(ValidationError, match="null"):
-        dataframe_field.deserialize(None)
+        schema.load({"data": input_data})
+    assert (
+        "invalid input type"
+        in exception.value.messages["data"][0]["_schema"][0].lower()
+    )
 
 
 @pytest.mark.parametrize(
     "input_data", ["", "string", 123, True, {"key": "value"}]
 )
-def test_dataframe_field_wrong_schema_notiter(dataframe_field, input_data):
-    with pytest.raises(ValidationError, match="Invalid"):
-        dataframe_field.deserialize(input_data)
+def test_records_schema_invalid_input_type_notiter(input_data):
+    class MySchema(RecordsDataFrameSchema):
+        dtypes = Dtypes(columns=["float"], dtypes=[np.dtype(np.float)])
+
+    schema = MySchema()
+
+    with pytest.raises(ValidationError) as exception:
+        schema.load({"data": input_data})
+
+    print(exception.value.messages)
 
 
-def _serialize_df(input_df, orient):
-    df = input_df.copy()
-    # convert all datetimes to strings to enforce validation
-    df["datetime"] = df["datetime"].astype(str)
-    return df.to_dict(orient=orient)
+def test_records_schema_none():
+    class MySchema(RecordsDataFrameSchema):
+        dtypes = Dtypes(columns=["float"], dtypes=[np.dtype(np.float)])
+
+    schema = MySchema()
+
+    with pytest.raises(ValidationError, match="null"):
+        schema.load({"data": None})
 
 
-def test_get_dataframe_schema_orient_records(sample_df):
-    DataFrameSchema = get_dataframe_schema(sample_df, orient="records")
-    schema = DataFrameSchema()
+def test_records_schema_missing_data_field():
+    class MySchema(RecordsDataFrameSchema):
+        dtypes = Dtypes(columns=["float"], dtypes=[np.dtype(np.float)])
 
-    assert schema.__class__.__name__ == "RequestRecordsDataFrameSchema"
+    schema = MySchema()
 
-    data_field = schema.fields["data"]
+    with pytest.raises(ValidationError) as exception:
+        schema.load({})
 
-    assert isinstance(data_field, fields.Nested)
-    assert isinstance(data_field.schema, BaseRecordsDataFrameSchema)
-
-    result = schema.load({"data": _serialize_df(sample_df, orient="records")})
-
-    assert_frame_equal(result, sample_df)
+    assert (
+        "missing data for required field"
+        in exception.value.messages["data"][0].lower()
+    )
 
 
-def test_get_dataframe_schema_orient_split(sample_df):
-    DataFrameSchema = get_dataframe_schema(sample_df, orient="split")
-    schema = DataFrameSchema()
+def test_split_schema(sample_df):
+    class MySchema(SplitDataFrameSchema):
+        dtypes = sample_df.dtypes
+        index_dtype = sample_df.index.dtype
 
-    assert schema.__class__.__name__ == "RequestSplitDataFrameSchema"
+    schema = MySchema()
 
     assert isinstance(schema.fields["data"].container, fields.Tuple)
     assert isinstance(schema.fields["columns"].container, fields.String)
     assert isinstance(schema.fields["index"].container, fields.Integer)
 
-    df = sample_df.copy()
-    df["datetime"] = df["datetime"].astype(str)
-    result = schema.load(_serialize_df(sample_df, orient="split"))
+    output = schema.load(serialize_df(sample_df, orient="split"))
 
-    assert_frame_equal(result, sample_df)
+    assert_frame_equal(output, sample_df)
 
 
-def test_get_dataframe_schema_orient_split_str_index(sample_df):
-    input_df = sample_df.copy()
-    input_df.index = input_df.index.astype(str)
+def test_split_schema_str_index(sample_df):
+    test_df = sample_df.copy()
+    test_df.index = test_df.index.astype(str)
 
-    DataFrameSchema = get_dataframe_schema(input_df, orient="split")
-    schema = DataFrameSchema()
+    class MySchema(SplitDataFrameSchema):
+        dtypes = test_df.dtypes
+        index_dtype = test_df.index.dtype
+
+    schema = MySchema()
 
     assert isinstance(schema.fields["index"].container, fields.String)
 
-    result = schema.load(_serialize_df(input_df, orient="split"))
+    result = schema.load(serialize_df(test_df, orient="split"))
 
-    assert_frame_equal(result, input_df)
+    assert_frame_equal(result, test_df)
 
 
-def test_get_dataframe_schema_orient_split_missing_column(sample_df):
+def test_split_schema_missing_column(sample_df):
+    class MySchema(SplitDataFrameSchema):
+        dtypes = sample_df.dtypes
+        index_dtype = sample_df.index.dtype
 
-    DataFrameSchema = get_dataframe_schema(sample_df, orient="split")
-    schema = DataFrameSchema()
+    schema = MySchema()
 
-    serialized_df = _serialize_df(sample_df, orient="split")
+    serialized_df = serialize_df(sample_df, orient="split")
 
     # delete one column name
     serialized_df["columns"].pop(0)
 
-    with pytest.raises(ValidationError, match="Must be equal to") as exc:
+    with pytest.raises(ValidationError) as exc:
         schema.load(serialized_df)
 
     assert (
@@ -207,12 +254,14 @@ def test_get_dataframe_schema_orient_split_missing_column(sample_df):
     )
 
 
-def test_get_dataframe_schema_orient_split_swapped_column(sample_df):
+def test_split_schema_swapped_column(sample_df):
+    class MySchema(SplitDataFrameSchema):
+        dtypes = sample_df.dtypes
+        index_dtype = sample_df.index.dtype
 
-    DataFrameSchema = get_dataframe_schema(sample_df, orient="split")
-    schema = DataFrameSchema()
+    schema = MySchema()
 
-    serialized_df = _serialize_df(sample_df, orient="split")
+    serialized_df = serialize_df(sample_df, orient="split")
 
     # randomly permutate column names in list
     old_columns = serialized_df["columns"]
@@ -220,10 +269,19 @@ def test_get_dataframe_schema_orient_split_swapped_column(sample_df):
         old_columns[i] for i in np.random.permutation(len(old_columns))
     ]
 
-    with pytest.raises(ValidationError, match="Must be equal to") as exc:
+    with pytest.raises(ValidationError) as exc:
         schema.load(serialized_df)
 
     assert (
         exc.value.messages["columns"][0]
         == f"Must be equal to {list(sample_df.columns)}."
     )
+
+
+# TODO on split schema tests:
+# - validation errors in `data`
+# - validation errors in `index`
+# - nulls
+
+# TODO on both schemas:
+# setup hypothesis testing
