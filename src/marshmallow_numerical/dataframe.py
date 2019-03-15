@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from marshmallow import fields, Schema, post_load, validate
-from typing import NamedTuple, List, Union, Optional
+from typing import NamedTuple, List, Union, Optional, Dict
 
 _FIELD_OPTIONS = {"required": True, "allow_none": True}
 
@@ -82,9 +82,6 @@ class RecordsDataFrameSchema(Schema):
     # Configuration attributes, should be implemented by subclasses
     dtypes: Union[Dtypes, pd.DataFrame]
 
-    # Schema fields
-    data: fields.Field
-
     def __init__(self, *args, **kwargs):
 
         dtypes = _validate_dtypes_attribute(self)
@@ -94,28 +91,30 @@ class RecordsDataFrameSchema(Schema):
         input_fields = {
             k: _dtype_to_field(v) for k, v in input_df_types.items()
         }
-        input_fields["_dtypes"] = dtypes
 
         # create schema dynamically
         RecordSchema = type("RecordSchema", (Schema,), input_fields)
 
-        # return nested schema field
-        self.data = fields.Nested(RecordSchema, many=True, required=True)
+        df_fields: Dict[str, fields.Field] = {
+            "data": fields.Nested(RecordSchema, many=True, required=True)
+        }
+
+        self._declared_fields.update(df_fields)
 
         super().__init__(*args, **kwargs)
 
     class Meta:
         strict = True
-        ordered = True
+        ordered = False
 
-    @post_load(pass_many=True)
-    def make_df(self, data: dict, many: bool) -> pd.DataFrame:
-        records_data = data.data
+    @post_load
+    def make_df(self, data: dict) -> pd.DataFrame:
+        records_data = data["data"]
         index_data = {i: row for i, row in enumerate(records_data)}
         return pd.DataFrame.from_dict(
-            index_data, orient="index", columns=self._dtypes.columns
+            index_data, orient="index", columns=self.dtypes.columns
         ).astype(
-            {k: v for k, v in zip(self._dtypes.columns, self._dtypes.dtypes)}
+            {k: v for k, v in zip(self.dtypes.columns, self.dtypes.dtypes)}
         )
 
 
@@ -126,18 +125,15 @@ class SplitDataFrameSchema(Schema):
     dtypes: Union[Dtypes, pd.DataFrame]
     index_dtype: Optional[np.dtype] = None
 
-    # Schema fields
-    index: fields.Field
-    data: fields.Field
-    columns: fields.Field
-
     def __init__(self, *args, **kwargs):
         dtypes = _validate_dtypes_attribute(self)
+
+        df_fields: Dict[str, fields.Field] = {}
 
         data_tuple_fields = [
             _dtype_to_field(dtype) for dtype in self.dtypes.dtypes
         ]
-        self.data = fields.List(fields.Tuple(data_tuple_fields))
+        df_fields["data"] = fields.List(fields.Tuple(data_tuple_fields))
 
         index_field = (
             fields.Raw()
@@ -145,20 +141,22 @@ class SplitDataFrameSchema(Schema):
             else _dtype_to_field(self.index_dtype)
         )
 
-        self.index = fields.List(index_field)
+        df_fields["index"] = fields.List(index_field)
 
-        self.columns = fields.List(
+        df_fields["columns"] = fields.List(
             fields.String,
             required=True,
             validate=validate.Equal(dtypes.columns),
         )
 
+        self._declared_fields.update(df_fields)
+
         super().__init__(*args, **kwargs)
 
     class Meta:
         strict = True
-        ordered = True
+        ordered = False
 
-    @post_load(pass_many=True)
-    def make_df(self, data: dict, many: bool) -> pd.DataFrame:
+    @post_load
+    def make_df(self, data: dict) -> pd.DataFrame:
         return pd.DataFrame(dtype=None, **data)
