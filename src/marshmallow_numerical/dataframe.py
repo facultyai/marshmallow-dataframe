@@ -127,12 +127,12 @@ class SplitDataFrameSchema(Schema):
     index_dtype: Optional[np.dtype] = None
 
     def __init__(self, *args, **kwargs):
-        dtypes = _validate_dtypes_attribute(self)
+        self._dtypes = _validate_dtypes_attribute(self)
 
         df_fields: Dict[str, fields.Field] = {}
 
         data_tuple_fields = [
-            _dtype_to_field(dtype) for dtype in self.dtypes.dtypes
+            _dtype_to_field(dtype) for dtype in self._dtypes.dtypes
         ]
         df_fields["data"] = fields.List(fields.Tuple(data_tuple_fields))
 
@@ -147,7 +147,7 @@ class SplitDataFrameSchema(Schema):
         df_fields["columns"] = fields.List(
             fields.String,
             required=True,
-            validate=validate.Equal(dtypes.columns),
+            validate=validate.Equal(self._dtypes.columns),
         )
 
         self._declared_fields.update(df_fields)
