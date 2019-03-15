@@ -66,12 +66,12 @@ def _validate_dtypes_attribute(schema: Schema) -> Dtypes:
             "`dtypes` attribute"
         ) from exc
 
-    if isinstance(dtypes, pd.DataFrame):
+    if isinstance(dtypes, pd.Series):
         dtypes = Dtypes.from_pandas_dtypes(dtypes)
     elif not isinstance(dtypes, Dtypes):
         raise ValueError(
             "The `dtypes` attribute on subclasses of "
-            f"{schema.__class__.__name__} must be either a pandas DataFrame "
+            f"{schema.__class__.__name__} must be either a pandas series "
             "or an instance of marshmallow_numerical.Dtypes"
         )
 
@@ -86,12 +86,12 @@ class RecordsDataFrameSchema(Schema):
 
     def __init__(self, *args, **kwargs):
 
-        dtypes = _validate_dtypes_attribute(self)
+        self._dtypes = _validate_dtypes_attribute(self)
 
         # create marshmallow fields
-        input_df_types = {k: v for k, v in zip(dtypes.columns, dtypes.dtypes)}
         input_fields = {
-            k: _dtype_to_field(v) for k, v in input_df_types.items()
+            k: _dtype_to_field(v)
+            for k, v in zip(self._dtypes.columns, self._dtypes.dtypes)
         }
 
         # create schema dynamically
@@ -113,9 +113,9 @@ class RecordsDataFrameSchema(Schema):
         records_data = data["data"]
         index_data = {i: row for i, row in enumerate(records_data)}
         return pd.DataFrame.from_dict(
-            index_data, orient="index", columns=self.dtypes.columns
+            index_data, orient="index", columns=self._dtypes.columns
         ).astype(
-            {k: v for k, v in zip(self.dtypes.columns, self.dtypes.dtypes)}
+            {k: v for k, v in zip(self._dtypes.columns, self._dtypes.dtypes)}
         )
 
 
