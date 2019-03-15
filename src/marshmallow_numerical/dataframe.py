@@ -105,7 +105,6 @@ class RecordsDataFrameSchema(Schema):
 
     class Meta:
         strict = True
-        ordered = False
 
     @post_load
     def make_df(self, data: dict) -> pd.DataFrame:
@@ -155,7 +154,6 @@ class SplitDataFrameSchema(Schema):
 
     class Meta:
         strict = True
-        ordered = False
 
     @post_load
     def make_df(self, data: dict) -> pd.DataFrame:
