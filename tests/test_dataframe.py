@@ -295,6 +295,6 @@ def test_schema_wrong_dtypes(base_class):
         dtypes = "wrong type for dtypes"
 
     with pytest.raises(
-        ValueError, match="must be either a pandas DataFrame or"
+        ValueError, match="must be either a pandas Series or"
     ):
         NewSchema()

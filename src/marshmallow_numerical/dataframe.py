@@ -71,7 +71,7 @@ def _validate_dtypes_attribute(schema: Schema) -> Dtypes:
     elif not isinstance(dtypes, Dtypes):
         raise ValueError(
             "The `dtypes` attribute on subclasses of "
-            f"{schema.__class__.__name__} must be either a pandas series "
+            f"{schema.__class__.__name__} must be either a pandas Series "
             "or an instance of marshmallow_numerical.Dtypes"
         )
 
