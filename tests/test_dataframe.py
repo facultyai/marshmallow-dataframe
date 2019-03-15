@@ -6,7 +6,7 @@ from dateutil.tz import tzutc
 from pandas.util.testing import assert_frame_equal
 from pandas.api.types import DatetimeTZDtype
 
-from marshmallow_numerical.dataframe import (
+from marshmallow_numerical import (
     Dtypes,
     SplitDataFrameSchema,
     RecordsDataFrameSchema,
