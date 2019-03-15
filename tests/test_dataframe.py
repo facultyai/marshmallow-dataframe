@@ -36,6 +36,16 @@ def sample_df():
     return df
 
 
+def serialize_df(df, orient='split'):
+    test_df = df.copy()
+    if "datetime" in test_df.columns:
+        test_df["datetime"] = test_df["datetime"].astype(str)
+    if orient == 'records':
+        return {"data": test_df.to_dict(orient='records')}
+    elif orient == 'split':
+        return test_df.to_dict(orient="split")
+
+
 @pytest.fixture
 def sample_dtypes(sample_df):
     return Dtypes.from_pandas_dtypes(sample_df.dtypes)
@@ -43,20 +53,25 @@ def sample_dtypes(sample_df):
 
 def test_records_schema(sample_df, sample_dtypes):
 
-    sample_df = sample_df.copy()
-    sample_df["datetime"] = sample_df["datetime"].astype(str)
-    serialized_df = {"data": sample_df.to_dict(orient="records")}
-
-    print(serialized_df)
-
     class MySchema(RecordsDataFrameSchema):
         dtypes = sample_dtypes
 
     schema = MySchema()
 
-    print(schema.fields)
+    output = schema.load(serialize_df(sample_df, orient='records'))
 
-    output = schema.load(serialized_df)
+    assert_frame_equal(output, sample_df)
+
+
+def test_split_schema(sample_df, sample_dtypes):
+
+    class MySchema(SplitDataFrameSchema):
+        dtypes = sample_dtypes
+        index_dtype = sample_df.index.dtype
+
+    schema = MySchema()
+
+    output = schema.load(serialize_df(sample_df, orient='split'))
 
     assert_frame_equal(output, sample_df)
 
