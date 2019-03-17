@@ -216,6 +216,24 @@ def test_split_schema(sample_df):
     assert_frame_equal(output, sample_df)
 
 
+@pytest.mark.parametrize("key", ["data", "index", "columns"])
+def test_split_schema_missing_top_level_key(key, sample_df):
+    class MySchema(SplitDataFrameSchema):
+        dtypes = sample_df.dtypes
+        index_dtype = sample_df.index.dtype
+
+    schema = MySchema()
+
+    serialized_df = serialize_df(sample_df, orient="split")
+
+    del serialized_df[key]
+
+    with pytest.raises(ValidationError) as exc:
+        schema.load(serialized_df)
+
+    assert exc.value.messages[key] == ["Missing data for required field."]
+
+
 def test_split_schema_str_index(sample_df):
     test_df = sample_df.copy()
     test_df.index = test_df.index.astype(str)
@@ -278,10 +296,67 @@ def test_split_schema_swapped_column(sample_df):
     )
 
 
-# TODO on split schema tests:
-# - validation errors in `data`
-# - validation errors in `index`
-# - nulls
+def test_split_schema_wrong_row_length(sample_df):
+    class MySchema(SplitDataFrameSchema):
+        dtypes = sample_df.dtypes
+        index_dtype = sample_df.index.dtype
+
+    schema = MySchema()
+
+    serialized_df = serialize_df(sample_df, orient="split")
+
+    # delete an item from data
+    del serialized_df["data"][0][-1]
+
+    with pytest.raises(ValidationError) as exc:
+        schema.load(serialized_df)
+
+    print(exc.value.messages)
+    assert (
+        exc.value.messages["data"][0][0]
+        == f"Length must be {len(sample_df.columns)}."
+    )
+
+
+def test_split_schema_wrong_type_in_data(sample_df):
+    class MySchema(SplitDataFrameSchema):
+        dtypes = sample_df.dtypes
+        index_dtype = sample_df.index.dtype
+
+    schema = MySchema()
+
+    serialized_df = serialize_df(sample_df, orient="split")
+
+    # set an item from int column to a non-int value
+    serialized_df["data"][0][0] = "notanint"
+
+    with pytest.raises(ValidationError) as exc:
+        schema.load(serialized_df)
+
+    assert exc.value.messages["data"][0][0][0] == f"Not a valid integer."
+
+
+@pytest.mark.parametrize("key", ["index", "data"])
+def test_split_schema_index_data_length_mismatch(key, sample_df):
+    class MySchema(SplitDataFrameSchema):
+        dtypes = sample_df.dtypes
+        index_dtype = sample_df.index.dtype
+
+    schema = MySchema()
+
+    serialized_df = serialize_df(sample_df, orient="split")
+
+    # set an item from int column to a non-int value
+    serialized_df[key].pop(0)
+
+    with pytest.raises(ValidationError) as exc:
+        schema.load(serialized_df)
+
+    assert (
+        exc.value.messages["data"][0]
+        == f"Length of `index` and `data` must be equal."
+    )
+
 
 # TODO on both schemas:
 # setup hypothesis testing

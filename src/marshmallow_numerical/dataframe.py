@@ -1,6 +1,13 @@
 import pandas as pd
 import numpy as np
-from marshmallow import fields, Schema, post_load, validate
+from marshmallow import (
+    fields,
+    Schema,
+    post_load,
+    validate,
+    ValidationError,
+    validates_schema,
+)
 from typing import NamedTuple, List, Union, Optional, Dict
 
 __all__ = ["Dtypes", "RecordsDataFrameSchema", "SplitDataFrameSchema"]
@@ -134,7 +141,9 @@ class SplitDataFrameSchema(Schema):
         data_tuple_fields = [
             _dtype_to_field(dtype) for dtype in self._dtypes.dtypes
         ]
-        df_fields["data"] = fields.List(fields.Tuple(data_tuple_fields))
+        df_fields["data"] = fields.List(
+            fields.Tuple(data_tuple_fields), required=True
+        )
 
         index_field = (
             fields.Raw()
@@ -142,7 +151,7 @@ class SplitDataFrameSchema(Schema):
             else _dtype_to_field(self.index_dtype)
         )
 
-        df_fields["index"] = fields.List(index_field)
+        df_fields["index"] = fields.List(index_field, required=True)
 
         df_fields["columns"] = fields.List(
             fields.String,
@@ -156,6 +165,13 @@ class SplitDataFrameSchema(Schema):
 
     class Meta:
         strict = True
+
+    @validates_schema(skip_on_field_errors=True)
+    def validate_index_data_length(self, data: dict) -> None:
+        if len(data["index"]) != len(data["data"]):
+            raise ValidationError(
+                "Length of `index` and `data` must be equal.", "data"
+            )
 
     @post_load
     def make_df(self, data: dict) -> pd.DataFrame:
