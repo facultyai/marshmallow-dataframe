@@ -72,9 +72,6 @@ def test_schema_wrong_dtypes(base_class):
 
 
 def test_records_schema(sample_df):
-
-    print(type(sample_df.dtypes))
-
     class MySchema(RecordsDataFrameSchema):
         dtypes = sample_df.dtypes
 
@@ -169,10 +166,8 @@ def test_records_schema_invalid_input_type_notiter(input_data):
 
     schema = MySchema()
 
-    with pytest.raises(ValidationError) as exception:
+    with pytest.raises(ValidationError):
         schema.load({"data": input_data})
-
-    print(exception.value.messages)
 
 
 def test_records_schema_none():
@@ -200,36 +195,45 @@ def test_records_schema_missing_data_field():
     )
 
 
-def test_split_schema(sample_df):
+@pytest.fixture
+def split_sample_schema(sample_df):
     class MySchema(SplitDataFrameSchema):
         dtypes = sample_df.dtypes
         index_dtype = sample_df.index.dtype
 
-    schema = MySchema()
+    return MySchema()
 
-    assert isinstance(schema.fields["data"].container, fields.Tuple)
-    assert isinstance(schema.fields["columns"].container, fields.String)
-    assert isinstance(schema.fields["index"].container, fields.Integer)
 
-    output = schema.load(serialize_df(sample_df, orient="split"))
+@pytest.fixture
+def split_serialized_df(sample_df):
+    return serialize_df(sample_df, orient="split")
+
+
+def test_split_schema(sample_df, split_sample_schema, split_serialized_df):
+
+    assert isinstance(
+        split_sample_schema.fields["data"].container, fields.Tuple
+    )
+    assert isinstance(
+        split_sample_schema.fields["columns"].container, fields.String
+    )
+    assert isinstance(
+        split_sample_schema.fields["index"].container, fields.Integer
+    )
+
+    output = split_sample_schema.load(split_serialized_df)
 
     assert_frame_equal(output, sample_df)
 
 
 @pytest.mark.parametrize("key", ["data", "index", "columns"])
-def test_split_schema_missing_top_level_key(key, sample_df):
-    class MySchema(SplitDataFrameSchema):
-        dtypes = sample_df.dtypes
-        index_dtype = sample_df.index.dtype
-
-    schema = MySchema()
-
-    serialized_df = serialize_df(sample_df, orient="split")
-
-    del serialized_df[key]
+def test_split_schema_missing_top_level_key(
+    key, split_sample_schema, split_serialized_df
+):
+    del split_serialized_df[key]
 
     with pytest.raises(ValidationError) as exc:
-        schema.load(serialized_df)
+        split_sample_schema.load(split_serialized_df)
 
     assert exc.value.messages[key] == ["Missing data for required field."]
 
@@ -251,20 +255,14 @@ def test_split_schema_str_index(sample_df):
     assert_frame_equal(result, test_df)
 
 
-def test_split_schema_missing_column(sample_df):
-    class MySchema(SplitDataFrameSchema):
-        dtypes = sample_df.dtypes
-        index_dtype = sample_df.index.dtype
-
-    schema = MySchema()
-
-    serialized_df = serialize_df(sample_df, orient="split")
-
+def test_split_schema_missing_column(
+    sample_df, split_sample_schema, split_serialized_df
+):
     # delete one column name
-    serialized_df["columns"].pop(0)
+    split_serialized_df["columns"].pop(0)
 
     with pytest.raises(ValidationError) as exc:
-        schema.load(serialized_df)
+        split_sample_schema.load(split_serialized_df)
 
     assert (
         exc.value.messages["columns"][0]
@@ -272,23 +270,17 @@ def test_split_schema_missing_column(sample_df):
     )
 
 
-def test_split_schema_swapped_column(sample_df):
-    class MySchema(SplitDataFrameSchema):
-        dtypes = sample_df.dtypes
-        index_dtype = sample_df.index.dtype
-
-    schema = MySchema()
-
-    serialized_df = serialize_df(sample_df, orient="split")
-
+def test_split_schema_swapped_column(
+    sample_df, split_sample_schema, split_serialized_df
+):
     # randomly permutate column names in list
-    old_columns = serialized_df["columns"]
-    serialized_df["columns"] = [
+    old_columns = split_serialized_df["columns"]
+    split_serialized_df["columns"] = [
         old_columns[i] for i in np.random.permutation(len(old_columns))
     ]
 
     with pytest.raises(ValidationError) as exc:
-        schema.load(serialized_df)
+        split_sample_schema.load(split_serialized_df)
 
     assert (
         exc.value.messages["columns"][0]
@@ -296,61 +288,42 @@ def test_split_schema_swapped_column(sample_df):
     )
 
 
-def test_split_schema_wrong_row_length(sample_df):
-    class MySchema(SplitDataFrameSchema):
-        dtypes = sample_df.dtypes
-        index_dtype = sample_df.index.dtype
-
-    schema = MySchema()
-
-    serialized_df = serialize_df(sample_df, orient="split")
-
+def test_split_schema_wrong_row_length(
+    sample_df, split_sample_schema, split_serialized_df
+):
     # delete an item from data
-    del serialized_df["data"][0][-1]
+    del split_serialized_df["data"][0][-1]
 
     with pytest.raises(ValidationError) as exc:
-        schema.load(serialized_df)
+        split_sample_schema.load(split_serialized_df)
 
-    print(exc.value.messages)
     assert (
         exc.value.messages["data"][0][0]
         == f"Length must be {len(sample_df.columns)}."
     )
 
 
-def test_split_schema_wrong_type_in_data(sample_df):
-    class MySchema(SplitDataFrameSchema):
-        dtypes = sample_df.dtypes
-        index_dtype = sample_df.index.dtype
-
-    schema = MySchema()
-
-    serialized_df = serialize_df(sample_df, orient="split")
-
+def test_split_schema_wrong_type_in_data(
+    split_sample_schema, split_serialized_df
+):
     # set an item from int column to a non-int value
-    serialized_df["data"][0][0] = "notanint"
+    split_serialized_df["data"][0][0] = "notanint"
 
     with pytest.raises(ValidationError) as exc:
-        schema.load(serialized_df)
+        split_sample_schema.load(split_serialized_df)
 
     assert exc.value.messages["data"][0][0][0] == f"Not a valid integer."
 
 
 @pytest.mark.parametrize("key", ["index", "data"])
-def test_split_schema_index_data_length_mismatch(key, sample_df):
-    class MySchema(SplitDataFrameSchema):
-        dtypes = sample_df.dtypes
-        index_dtype = sample_df.index.dtype
-
-    schema = MySchema()
-
-    serialized_df = serialize_df(sample_df, orient="split")
-
+def test_split_schema_index_data_length_mismatch(
+    key, split_sample_schema, split_serialized_df
+):
     # set an item from int column to a non-int value
-    serialized_df[key].pop(0)
+    split_serialized_df[key].pop(0)
 
     with pytest.raises(ValidationError) as exc:
-        schema.load(serialized_df)
+        split_sample_schema.load(split_serialized_df)
 
     assert (
         exc.value.messages["data"][0]
