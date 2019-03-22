@@ -1,10 +1,14 @@
 import numpy as np
 import pandas as pd
 import pytest
+import hypothesis
+import hypothesis.strategies as st
+import datetime
 from marshmallow import ValidationError, fields
 from dateutil.tz import tzutc
 from pandas.util.testing import assert_frame_equal
 from pandas.api.types import DatetimeTZDtype
+from hypothesis.extra.pandas import data_frames, column, indexes
 
 from marshmallow_numerical import (
     Dtypes,
@@ -80,6 +84,39 @@ def test_records_schema(sample_df):
     output = schema.load(serialize_df(sample_df, orient="records"))
 
     assert_frame_equal(output, sample_df)
+
+
+@hypothesis.given(
+    test_df=data_frames(
+        columns=[
+            column("A", dtype=int),
+            column("B", dtype=float),
+            column("C", dtype=bool),
+            column("D", elements=st.characters(), dtype=str),
+            column(
+                "E",
+                elements=st.datetimes(
+                    min_value=pd.Timestamp.min, max_value=pd.Timestamp.max
+                ),
+                dtype=datetime.datetime,
+            ),
+        ],
+        index=indexes(
+            elements=st.one_of(st.characters(), st.integers(), st.datetimes())
+        ),
+    )
+)
+def test_records_schema_hypothesis(test_df):
+    class MySchema(RecordsDataFrameSchema):
+        dtypes = test_df.dtypes
+
+    schema = MySchema()
+
+    print(schema.fields)
+
+    output = schema.load(serialize_df(test_df, orient="records"))
+
+    assert_frame_equal(output, test_df)
 
 
 def test_records_schema_missing_column(sample_df):
@@ -224,6 +261,40 @@ def test_split_schema(sample_df, split_sample_schema, split_serialized_df):
     output = split_sample_schema.load(split_serialized_df)
 
     assert_frame_equal(output, sample_df)
+
+
+@hypothesis.given(
+    test_df=data_frames(
+        columns=[
+            column("A", dtype=int),
+            column("B", dtype=float),
+            column("C", dtype=bool),
+            column("D", elements=st.characters(), dtype=str),
+            column(
+                "E",
+                elements=st.datetimes(
+                    min_value=pd.Timestamp.min, max_value=pd.Timestamp.max
+                ),
+                dtype=datetime.datetime,
+            ),
+        ],
+        index=indexes(
+            #  elements=st.one_of(st.characters(), st.integers(), st.datetimes())
+            elements=st.characters(),
+            dtype=str,
+        ),
+    )
+)
+def test_split_schema_hypothesis(test_df):
+    class MySchema(SplitDataFrameSchema):
+        dtypes = test_df.dtypes
+        index_dtype = test_df.index.dtype
+
+    schema = MySchema()
+
+    output = schema.load(serialize_df(test_df, orient="split"))
+
+    assert_frame_equal(output, test_df)
 
 
 @pytest.mark.parametrize("key", ["data", "index", "columns"])
