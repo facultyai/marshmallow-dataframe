@@ -279,7 +279,9 @@ def test_split_schema(sample_df, split_sample_schema, split_serialized_df):
             ),
         ],
         index=indexes(
-            #  elements=st.one_of(st.characters(), st.integers(), st.datetimes())
+            #  elements=st.one_of(
+            #       st.characters(), st.integers(), st.datetimes()
+            #  )
             elements=st.characters(),
             dtype=str,
         ),
