@@ -19,7 +19,7 @@ _FIELD_OPTIONS = {"required": True, "allow_none": True}
 DTYPE_KIND_TO_FIELD = {
     "i": fields.Int(required=True),
     "u": fields.Int(**_FIELD_OPTIONS),
-    "f": fields.Float(**_FIELD_OPTIONS),
+    "f": fields.Float(allow_nan=True, **_FIELD_OPTIONS),
     "O": fields.Str(**_FIELD_OPTIONS),
     "b": fields.Bool(**_FIELD_OPTIONS),
     "M": fields.DateTime(**_FIELD_OPTIONS),

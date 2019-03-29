@@ -93,32 +93,39 @@ def test_records_schema(sample_df):
 @hypothesis.given(
     test_df=data_frames(
         columns=[
-            column("A", dtype=int),
-            column("B", dtype=float),
-            column("C", dtype=bool),
-            column("D", elements=st.characters(), dtype=str),
+            column("int", dtype=int),
+            column("float", dtype=float),
+            column("bool", dtype=bool),
+            column("chars", elements=st.characters(), dtype=str),
             column(
-                "E",
+                "datetime",
                 elements=st.datetimes(
                     min_value=pd.Timestamp.min, max_value=pd.Timestamp.max
                 ),
-                dtype=datetime.datetime,
+                dtype="datetime64[s]",
             ),
         ],
-        index=indexes(
-            elements=st.one_of(st.characters(), st.integers(), st.datetimes())
-        ),
+        # records serialization format does not record indices, so we always
+        # set them to an integer index.
+        index=indexes(elements=st.integers()),
     )
 )
 def test_records_schema_hypothesis(test_df):
+
+    if not len(test_df.index):
+        # ignore empty datasets as dtype is impossible to infer from serialized
+        return
+
     class MySchema(RecordsDataFrameSchema):
         dtypes = test_df.dtypes
 
     schema = MySchema()
 
-    print(schema.fields)
-
     output = schema.load(serialize_df(test_df, orient="records"))
+
+    # Ignore indices in the test as the records serialization format does not
+    # support them
+    output.index = test_df.index
 
     assert_frame_equal(output, test_df)
 
@@ -270,28 +277,29 @@ def test_split_schema(sample_df, split_sample_schema, split_serialized_df):
 @hypothesis.given(
     test_df=data_frames(
         columns=[
-            column("A", dtype=int),
-            column("B", dtype=float),
-            column("C", dtype=bool),
-            column("D", elements=st.characters(), dtype=str),
+            column("int", dtype=int),
+            column("float", dtype=float),
+            column("bool", dtype=bool),
+            column("chars", elements=st.characters(), dtype=str),
             column(
-                "E",
+                "datetime",
                 elements=st.datetimes(
                     min_value=pd.Timestamp.min, max_value=pd.Timestamp.max
                 ),
-                dtype=datetime.datetime,
+                dtype="datetime64[s]",
             ),
         ],
-        index=indexes(
-            #  elements=st.one_of(
-            #       st.characters(), st.integers(), st.datetimes()
-            #  )
-            elements=st.characters(),
-            dtype=str,
+        index=(
+            indexes(elements=st.characters()) | indexes(elements=st.integers())
         ),
     )
 )
 def test_split_schema_hypothesis(test_df):
+
+    if not len(test_df.index):
+        # ignore empty datasets as dtype is impossible to infer from serialized
+        return
+
     class MySchema(SplitDataFrameSchema):
         dtypes = test_df.dtypes
         index_dtype = test_df.index.dtype
