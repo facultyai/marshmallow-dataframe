@@ -290,7 +290,13 @@ def test_split_schema(sample_df, split_sample_schema, split_serialized_df):
             ),
         ],
         index=(
-            indexes(elements=st.characters()) | indexes(elements=st.integers())
+            indexes(
+                elements=st.integers(
+                    min_value=np.iinfo(np.int64).min,
+                    max_value=np.iinfo(np.int64).max,
+                )
+            )
+            | indexes(elements=st.characters())
         ),
     )
 )
