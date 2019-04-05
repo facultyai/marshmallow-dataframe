@@ -1,10 +1,11 @@
 import numpy as np
 import pandas as pd
 import pytest
+import hypothesis
+import hypothesis.strategies as st
 from marshmallow import ValidationError, fields
-from dateutil.tz import tzutc
 from pandas.util.testing import assert_frame_equal
-from pandas.api.types import DatetimeTZDtype
+from hypothesis.extra.pandas import data_frames, column, indexes
 
 from marshmallow_numerical import (
     Dtypes,
@@ -25,13 +26,7 @@ def sample_df():
         }
     )
 
-    # pd.to_datetime defaults to 'UTC' timezone, whereas datetime objects
-    # deserialized by marshmallow have a 'tzutc()' timezone. They are
-    # functionally equivalent, but fail equality comparison, so here we set the
-    # dtype to the one that marshmallow returns.
-    df["datetime"] = pd.to_datetime(df["datetime"]).astype(
-        DatetimeTZDtype("ns", tzutc())
-    )
+    df["datetime"] = pd.to_datetime(df["datetime"]).astype("datetime64[ns]")
 
     return df
 
@@ -40,10 +35,14 @@ def serialize_df(df, orient="split"):
     test_df = df.copy()
     if "datetime" in test_df.columns:
         # convert all datetimes to strings to enforce validation
-        test_df["datetime"] = test_df["datetime"].astype(str)
+        test_df["datetime"] = test_df["datetime"].dt.strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
     if orient == "records":
         return {"data": test_df.to_dict(orient="records")}
     elif orient == "split":
+        if test_df.index.dtype.kind == "M":
+            test_df.index = test_df.index.strftime("%Y-%m-%d %H:%M:%S")
         return test_df.to_dict(orient="split")
 
 
@@ -80,6 +79,53 @@ def test_records_schema(sample_df):
     output = schema.load(serialize_df(sample_df, orient="records"))
 
     assert_frame_equal(output, sample_df)
+
+
+@hypothesis.given(
+    test_df=data_frames(
+        columns=[
+            column("int", dtype=int),
+            column("float", dtype=float),
+            column("bool", dtype=bool),
+            column("chars", elements=st.characters()),
+            column(
+                "datetime",
+                elements=st.datetimes(
+                    min_value=pd.Timestamp.min, max_value=pd.Timestamp.max
+                ),
+                dtype="datetime64[s]",
+            ),
+        ],
+        # records serialization format does not record indices, so we always
+        # set them to an integer index.
+        index=(
+            indexes(
+                elements=st.integers(
+                    min_value=np.iinfo(np.int64).min,
+                    max_value=np.iinfo(np.int64).max,
+                )
+            )
+        ),
+    )
+)
+def test_records_schema_hypothesis(test_df):
+
+    if not len(test_df.index):
+        # ignore empty datasets as dtype is impossible to infer from serialized
+        return
+
+    class MySchema(RecordsDataFrameSchema):
+        dtypes = test_df.dtypes
+
+    schema = MySchema()
+
+    output = schema.load(serialize_df(test_df, orient="records"))
+
+    # Ignore indices in the test as the records serialization format does not
+    # support them
+    output.index = test_df.index
+
+    assert_frame_equal(output, test_df)
 
 
 def test_records_schema_missing_column(sample_df):
@@ -226,6 +272,49 @@ def test_split_schema(sample_df, split_sample_schema, split_serialized_df):
     assert_frame_equal(output, sample_df)
 
 
+@hypothesis.given(
+    test_df=data_frames(
+        columns=[
+            column("int", dtype=int),
+            column("float", dtype=float),
+            column("bool", dtype=bool),
+            column("chars", elements=st.characters()),
+            column(
+                "datetime",
+                elements=st.datetimes(
+                    min_value=pd.Timestamp.min, max_value=pd.Timestamp.max
+                ),
+                dtype="datetime64[s]",
+            ),
+        ],
+        index=(
+            indexes(
+                elements=st.integers(
+                    min_value=np.iinfo(np.int64).min,
+                    max_value=np.iinfo(np.int64).max,
+                )
+            )
+            | indexes(elements=st.characters())
+        ),
+    )
+)
+def test_split_schema_hypothesis(test_df):
+
+    if not len(test_df.index):
+        # ignore empty datasets as dtype is impossible to infer from serialized
+        return
+
+    class MySchema(SplitDataFrameSchema):
+        dtypes = test_df.dtypes
+        index_dtype = test_df.index.dtype
+
+    schema = MySchema()
+
+    output = schema.load(serialize_df(test_df, orient="split"))
+
+    assert_frame_equal(output, test_df)
+
+
 @pytest.mark.parametrize("key", ["data", "index", "columns"])
 def test_split_schema_missing_top_level_key(
     key, split_sample_schema, split_serialized_df
@@ -329,7 +418,3 @@ def test_split_schema_index_data_length_mismatch(
         exc.value.messages["data"][0]
         == f"Length of `index` and `data` must be equal."
     )
-
-
-# TODO on both schemas:
-# setup hypothesis testing
