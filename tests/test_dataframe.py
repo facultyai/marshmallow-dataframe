@@ -5,7 +5,6 @@ import hypothesis
 import hypothesis.strategies as st
 from marshmallow import ValidationError, fields
 from pandas.util.testing import assert_frame_equal
-from pandas.api.types import DatetimeTZDtype
 from hypothesis.extra.pandas import data_frames, column, indexes
 
 from marshmallow_numerical import (
