@@ -3,9 +3,7 @@ import pandas as pd
 import pytest
 import hypothesis
 import hypothesis.strategies as st
-import datetime
 from marshmallow import ValidationError, fields
-from dateutil.tz import tzutc
 from pandas.util.testing import assert_frame_equal
 from pandas.api.types import DatetimeTZDtype
 from hypothesis.extra.pandas import data_frames, column, indexes
@@ -29,13 +27,7 @@ def sample_df():
         }
     )
 
-    # pd.to_datetime defaults to 'UTC' timezone, whereas datetime objects
-    # deserialized by marshmallow have a 'tzutc()' timezone. They are
-    # functionally equivalent, but fail equality comparison, so here we set the
-    # dtype to the one that marshmallow returns.
-    df["datetime"] = pd.to_datetime(df["datetime"]).astype(
-        DatetimeTZDtype("ns", tzutc())
-    )
+    df["datetime"] = pd.to_datetime(df["datetime"]).astype("datetime64[ns]")
 
     return df
 
@@ -280,7 +272,7 @@ def test_split_schema(sample_df, split_sample_schema, split_serialized_df):
             column("int", dtype=int),
             column("float", dtype=float),
             column("bool", dtype=bool),
-            column("chars", elements=st.characters(), dtype=str),
+            column("chars", elements=st.characters()),
             column(
                 "datetime",
                 elements=st.datetimes(
@@ -420,7 +412,3 @@ def test_split_schema_index_data_length_mismatch(
         exc.value.messages["data"][0]
         == f"Length of `index` and `data` must be equal."
     )
-
-
-# TODO on both schemas:
-# setup hypothesis testing
