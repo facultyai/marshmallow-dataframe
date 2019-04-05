@@ -87,7 +87,7 @@ def test_records_schema(sample_df):
             column("int", dtype=int),
             column("float", dtype=float),
             column("bool", dtype=bool),
-            column("chars", elements=st.characters(), dtype=str),
+            column("chars", elements=st.characters()),
             column(
                 "datetime",
                 elements=st.datetimes(
@@ -98,7 +98,14 @@ def test_records_schema(sample_df):
         ],
         # records serialization format does not record indices, so we always
         # set them to an integer index.
-        index=indexes(elements=st.integers()),
+        index=(
+            indexes(
+                elements=st.integers(
+                    min_value=np.iinfo(np.int64).min,
+                    max_value=np.iinfo(np.int64).max,
+                )
+            )
+        ),
     )
 )
 def test_records_schema_hypothesis(test_df):
