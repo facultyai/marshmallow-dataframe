@@ -1,8 +1,17 @@
+from os import path
 from setuptools import setup, find_packages
+
+with open(
+    path.join(path.abspath(path.dirname(__file__)), "README.md"),
+    encoding="utf-8",
+) as f:
+    long_description = f.read()
 
 setup(
     name="marshmallow-numerical",
     description="Marshmallow Schema generator for pandas and numpy",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     license="MIT",
     url="https://github.com/zblz/marshmallow-numerical",
     author="Víctor Zabalza",
