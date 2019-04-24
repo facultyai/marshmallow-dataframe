@@ -41,7 +41,7 @@ class Dtypes(NamedTuple):
         return pd.DataFrame(index=self.columns, data=self.dtypes)
 
 
-class DtypeToFieldConversionoError(Exception):
+class DtypeToFieldConversionError(Exception):
     pass
 
 
@@ -49,7 +49,7 @@ def _dtype_to_field(dtype: np.dtype) -> fields.Field:
     try:
         kind = dtype.kind
     except AttributeError as exc:
-        raise DtypeToFieldConversionoError(
+        raise DtypeToFieldConversionError(
             f"The dtype {dtype} does not have a `kind` attribute, "
             "unable to map dtype into marshmallow field type"
         ) from exc
@@ -57,7 +57,7 @@ def _dtype_to_field(dtype: np.dtype) -> fields.Field:
     try:
         return DTYPE_KIND_TO_FIELD[kind]
     except KeyError as exc:
-        raise DtypeToFieldConversionoError(
+        raise DtypeToFieldConversionError(
             f"The conversion of the dtype {dtype} with kind {dtype.kind} "
             "into marshmallow fields is unknown. Known kinds are: "
             f"{DTYPE_KIND_TO_FIELD.keys()}"
