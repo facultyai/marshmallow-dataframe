@@ -91,3 +91,31 @@ install it with pip:
 ```
 pip install marshmallow-numerical
 ```
+
+# Contributing
+
+Contributions are welcome!
+
+You can report a problem or feature request in the [issue
+tracker](https://github.org/zblz/marshmallow_numerical/issues). If you feel that
+you can fix it or implement it, please submit a pull request referencing the
+issues it solves.
+
+Unit tests written using the [`pytest`](https://pytest.org) framework are in the
+`tests` directory, and are run using
+[tox](https://tox.readthedocs.io/en/latest/) on Python 3.6 and 3.7. You can run
+the tests by installing tox:
+```
+pip install tox
+```
+and running the linters and tests for all Python versions by running `tox`, or
+for a specific Python version by running:
+```
+tox -e py36
+```
+
+We format the code with [black](https://github.com/ambv/black), and you can
+format your checkout of the code before commiting it by running:
+```
+tox -e black -- .
+```
