@@ -49,12 +49,12 @@ build a dataframe:
 animal_schema = AnimalSchema()
 
 new_animal = {
-    "data": [("leopard", "mammal", 58.0, 4)],
+    "data": [("leopard", "mammal", 58.0, 4), ("ant", "insect", 0.288, 6)],
     "columns": ["name", "class", "max_speed", "num_legs"],
-    "index": [0],
+    "index": [0, 1],
 }
 
-new_animal_df = schema.load(new_animal)
+new_animal_df = animal_schema.load(new_animal)
 
 print(new_animal_df)
 #       name   class  max_speed  num_legs
@@ -72,7 +72,7 @@ invalid_animal = {
     "index": [0],
 }
 
-schema.load(invalid_animal)
+animal_schema.load(invalid_animal)
 
 # Raises:
 # marshmallow.exceptions.ValidationError: {'columns': ["Must be equal to ['name', 'class', 'max_speed', 'num_legs']."], 'data': {0: {3: ['Not a valid integer.']}}}
