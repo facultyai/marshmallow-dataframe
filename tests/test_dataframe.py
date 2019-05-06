@@ -362,11 +362,8 @@ def test_split_schema_missing_column(
 def test_split_schema_swapped_column(
     sample_df, split_sample_schema, split_serialized_df
 ):
-    # randomly permutate column names in list
-    old_columns = split_serialized_df["columns"]
-    split_serialized_df["columns"] = [
-        old_columns[i] for i in np.random.permutation(len(old_columns))
-    ]
+    # reverse order of columns so it does not match schema
+    split_serialized_df["columns"] = split_serialized_df["columns"][::-1]
 
     with pytest.raises(ValidationError) as exc:
         split_sample_schema.load(split_serialized_df)
