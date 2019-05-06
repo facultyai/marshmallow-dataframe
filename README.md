@@ -56,6 +56,8 @@ new_animal = {
 
 new_animal_df = animal_schema.load(new_animal)
 
+print(type(new_animal_df))
+# <class 'pandas.core.frame.DataFrame'>
 print(new_animal_df)
 #       name   class  max_speed  num_legs
 # 0  leopard  mammal     58.000         4
@@ -97,7 +99,7 @@ pip install marshmallow-numerical
 Contributions are welcome!
 
 You can report a problem or feature request in the [issue
-tracker](https://github.org/zblz/marshmallow_numerical/issues). If you feel that
+tracker](https://github.com/zblz/marshmallow-numerical/issues). If you feel that
 you can fix it or implement it, please submit a pull request referencing the
 issues it solves.
 
@@ -114,7 +116,7 @@ for a specific Python version by running:
 tox -e py36
 ```
 
-We format the code with [black](https://github.com/ambv/black), and you can
+We format the code with [black](https://github.com/python/black), and you can
 format your checkout of the code before commiting it by running:
 ```
 tox -e black -- .
