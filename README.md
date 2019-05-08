@@ -1,12 +1,12 @@
-# marshmallow-numerical
+# marshmallow-dataframe
 
-[![Build Status](https://travis-ci.org/zblz/marshmallow-numerical.svg?branch=master)](https://travis-ci.org/zblz/marshmallow-numerical)
-[![PyPI](https://img.shields.io/pypi/v/marshmallow-numerical.svg)](https://pypi.org/project/marshmallow-numerical/)
-[![License](https://img.shields.io/github/license/zblz/marshmallow-numerical.svg)](https://github.com/zblz/marshmallow-numerical/blob/master/LICENSE)
+[![Build Status](https://travis-ci.org/zblz/marshmallow-dataframe.svg?branch=master)](https://travis-ci.org/zblz/marshmallow-dataframe)
+[![PyPI](https://img.shields.io/pypi/v/marshmallow-dataframe.svg)](https://pypi.org/project/marshmallow-dataframe/)
+[![License](https://img.shields.io/github/license/zblz/marshmallow-dataframe.svg)](https://github.com/zblz/marshmallow-dataframe/blob/master/LICENSE)
 
-`marshmallow-numerical` is a library that helps you generate
-[marshmallow](https://marshmallow.readthedocs.io/) Schemas for Pandas and Numpy
-data structures.
+`marshmallow-dataframe` is a library that helps you generate
+[marshmallow](https://marshmallow.readthedocs.io/) Schemas for Pandas
+DataFrames.
 
 # Usage
 
@@ -17,7 +17,7 @@ is a float, and the last one is an integer.
 ```python
 import pandas as pd
 import numpy as np
-from marshmallow_numerical import SplitDataFrameSchema
+from marshmallow_dataframe import SplitDataFrameSchema
 
 animal_df = pd.DataFrame(
     [
@@ -80,18 +80,18 @@ animal_schema.load(invalid_animal)
 # marshmallow.exceptions.ValidationError: {'columns': ["Must be equal to ['name', 'class', 'max_speed', 'num_legs']."], 'data': {0: {3: ['Not a valid integer.']}}}
 ```
 
-`marshmallow_numerical` can also generate Schemas for the `orient=records`
+`marshmallow_dataframe` can also generate Schemas for the `orient=records`
 format by following the above steps but using
-`marshmallow_numerical.RecordsDataFrameSchema` as the superclass for
+`marshmallow_dataframe.RecordsDataFrameSchema` as the superclass for
 `AnimalSchema`.
 
 # Installation
 
-marshmallow-numerical requires Python >= 3.6 and marshmallow >= 3.0. You can
+marshmallow-dataframe requires Python >= 3.6 and marshmallow >= 3.0. You can
 install it with pip:
 
 ```
-pip install marshmallow-numerical
+pip install marshmallow-dataframe
 ```
 
 # Contributing
@@ -99,7 +99,7 @@ pip install marshmallow-numerical
 Contributions are welcome!
 
 You can report a problem or feature request in the [issue
-tracker](https://github.com/zblz/marshmallow-numerical/issues). If you feel that
+tracker](https://github.com/zblz/marshmallow-dataframe/issues). If you feel that
 you can fix it or implement it, please submit a pull request referencing the
 issues it solves.
 
