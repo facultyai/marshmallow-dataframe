@@ -7,7 +7,7 @@ from marshmallow import ValidationError, fields
 from pandas.util.testing import assert_frame_equal
 from hypothesis.extra.pandas import data_frames, column, indexes
 
-from marshmallow_numerical import (
+from marshmallow_dataframe import (
     Dtypes,
     SplitDataFrameSchema,
     RecordsDataFrameSchema,
