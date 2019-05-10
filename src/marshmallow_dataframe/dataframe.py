@@ -80,6 +80,8 @@ class DataFrameSchemaOpts(ma.SchemaOpts):
     def __init__(self, meta, *args, **kwargs):
         super().__init__(meta, *args, **kwargs)
         self.dtypes = getattr(meta, "dtypes", None)
+        if self.dtypes is not None:
+            self.dtypes = _validate_dtypes(self.dtypes)
         self.index_dtype = getattr(meta, "index_dtype", None)
         self.strict = getattr(meta, "strict", True)
 
@@ -122,12 +124,11 @@ class RecordsDataFrameSchemaMeta(DataFrameSchemaMeta):
     ) -> Dict[str, ma.fields.Field]:
 
         if opts.dtypes is not None:
-            dtypes = _validate_dtypes(opts.dtypes)
 
             # create marshmallow fields
             input_fields = {
                 k: _dtype_to_field(v)
-                for k, v in zip(dtypes.columns, dtypes.dtypes)
+                for k, v in zip(opts.dtypes.columns, opts.dtypes.dtypes)
             }
 
             # create schema dynamically
@@ -151,13 +152,12 @@ class SplitDataFrameSchemaMeta(DataFrameSchemaMeta):
     ) -> Dict[str, ma.fields.Field]:
 
         if opts.dtypes is not None:
-            dtypes = _validate_dtypes(opts.dtypes)
             index_dtype = opts.index_dtype
 
             fields: Dict[str, ma.fields.Field] = dict_cls()
 
             data_tuple_fields = [
-                _dtype_to_field(dtype) for dtype in dtypes.dtypes
+                _dtype_to_field(dtype) for dtype in opts.dtypes.dtypes
             ]
             fields["data"] = ma.fields.List(
                 ma.fields.Tuple(data_tuple_fields), required=True
@@ -174,7 +174,7 @@ class SplitDataFrameSchemaMeta(DataFrameSchemaMeta):
             fields["columns"] = ma.fields.List(
                 ma.fields.String,
                 required=True,
-                validate=ma.validate.Equal(dtypes.columns),
+                validate=ma.validate.Equal(opts.dtypes.columns),
             )
 
             return fields
@@ -192,9 +192,14 @@ class RecordsDataFrameSchema(ma.Schema, metaclass=RecordsDataFrameSchemaMeta):
         records_data = data["data"]
         index_data = {i: row for i, row in enumerate(records_data)}
         return pd.DataFrame.from_dict(
-            index_data, orient="index", columns=self._dtypes.columns
+            index_data, orient="index", columns=self.opts.dtypes.columns
         ).astype(
-            {k: v for k, v in zip(self._dtypes.columns, self._dtypes.dtypes)}
+            {
+                k: v
+                for k, v in zip(
+                    self.opts.dtypes.columns, self.opts.dtypes.dtypes
+                )
+            }
         )
 
 
