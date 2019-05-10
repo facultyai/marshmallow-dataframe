@@ -33,13 +33,18 @@ animal_df = pd.DataFrame(
 You can then create a marshmallow schema that will validate and load dataframes
 that follow the same structure as the one above and that have been serialized
 with `DataFrame.to_json` with the [`orient=split`
-format](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_json.html#pandas.DataFrame.to_json):
+format](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_json.html#pandas.DataFrame.to_json).
+The `dtypes` attribute of the `Meta` class is required, and other [`marshmallow`
+Schema
+options](https://marshmallow.readthedocs.io/en/latest/api_reference.html#marshmallow.Schema.Meta)
+can also be passed as attributes of `Meta`:
 
 ```python
 class AnimalSchema(SplitDataFrameSchema):
     """Automatically generated schema for animal dataframe"""
 
-    dtypes = animal_df.dtypes
+    class Meta:
+        dtypes = animal_df.dtypes
 ```
 
 When passing a valid payload for a new animal, this schema will validate it and
