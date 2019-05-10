@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import marshmallow as ma
-from typing import NamedTuple, List, Union, Optional, Dict
+from typing import NamedTuple, List, Union, Dict
 
 __all__ = ["Dtypes", "RecordsDataFrameSchema", "SplitDataFrameSchema"]
 
@@ -57,56 +57,133 @@ def _dtype_to_field(dtype: np.dtype) -> ma.fields.Field:
         ) from exc
 
 
-def _validate_dtypes_attribute(schema: ma.Schema) -> Dtypes:
-    try:
-        dtypes = schema.dtypes
-    except AttributeError as exc:
-        raise NotImplementedError(
-            f"Subclasses of {schema.__class__.__name__} must define the "
-            "`dtypes` attribute"
-        ) from exc
-
+def _validate_dtypes(dtypes: Union[Dtypes, pd.DataFrame]) -> Dtypes:
     if isinstance(dtypes, pd.Series):
         dtypes = Dtypes.from_pandas_dtypes(dtypes)
     elif not isinstance(dtypes, Dtypes):
         raise ValueError(
-            "The `dtypes` attribute on subclasses of "
-            f"{schema.__class__.__name__} must be either a pandas Series "
-            "or an instance of marshmallow_dataframe.Dtypes"
+            "The `dtypes` Meta option on a DataFrame Schema must be either a "
+            "pandas Series or an instance of marshmallow_dataframe.Dtypes"
         )
 
     return dtypes
 
 
-class RecordsDataFrameSchema(ma.Schema):
+class DataFrameSchemaOpts(ma.SchemaOpts):
+    """Options class for BaseDataFrameSchema
+
+    Adds the following options:
+    - ``dtypes``
+    - ``index_dtype``
+    """
+
+    def __init__(self, meta, *args, **kwargs):
+        super().__init__(meta, *args, **kwargs)
+        self.dtypes = getattr(meta, "dtypes", None)
+        self.index_dtype = getattr(meta, "index_dtype", None)
+        self.strict = getattr(meta, "strict", True)
+
+
+class DataFrameSchemaMeta(ma.schema.SchemaMeta):
+    """Base metaclass for DataFrame schemas"""
+
+    @classmethod
+    def get_declared_fields(
+        mcs, klass, cls_fields, inherited_fields, dict_cls
+    ) -> Dict[str, ma.fields.Field]:
+        """
+        Updates declared fields with fields generated from DataFrame dtypes
+        """
+
+        opts = klass.opts
+        declared_fields = super().get_declared_fields(
+            klass, cls_fields, inherited_fields, dict_cls
+        )
+        fields = mcs.get_fields(opts, dict_cls)
+        fields.update(declared_fields)
+        return fields
+
+    @classmethod
+    def get_fields(
+        mcs, opts: DataFrameSchemaOpts, dict_cls
+    ) -> Dict[str, ma.fields.Field]:
+        """
+        Generate fields from DataFrame dtypes
+
+        To be implemented in subclasses of DataFrameSchemaMeta
+        """
+        pass
+
+
+class RecordsDataFrameSchemaMeta(DataFrameSchemaMeta):
+    @classmethod
+    def get_fields(
+        mcs, opts: DataFrameSchemaOpts, dict_cls
+    ) -> Dict[str, ma.fields.Field]:
+
+        if opts.dtypes is not None and opts.index_dtype is not None:
+            dtypes = _validate_dtypes(opts.dtypes)
+
+            # create marshmallow fields
+            input_fields = {
+                k: _dtype_to_field(v)
+                for k, v in zip(dtypes.columns, dtypes.dtypes)
+            }
+
+            # create schema dynamically
+            RecordSchema = type("RecordSchema", (ma.Schema,), input_fields)
+
+            fields: Dict[str, ma.fields.Field] = dict_cls()
+
+            fields["data"] = ma.fields.Nested(
+                RecordSchema, many=True, required=True
+            )
+
+            return fields
+
+        return dict_cls()
+
+
+class SplitDataFrameSchemaMeta(DataFrameSchemaMeta):
+    @classmethod
+    def get_fields(
+        mcs, opts: DataFrameSchemaOpts, dict_cls
+    ) -> Dict[str, ma.fields.Field]:
+
+        if opts.dtypes is not None and opts.index_dtype is not None:
+            dtypes = _validate_dtypes(opts.dtypes)
+            index_dtype = opts.index_dtype
+
+            fields: Dict[str, ma.fields.Field] = dict_cls()
+
+            data_tuple_fields = [
+                _dtype_to_field(dtype) for dtype in dtypes.dtypes
+            ]
+            fields["data"] = ma.fields.List(
+                ma.fields.Tuple(data_tuple_fields), required=True
+            )
+
+            index_field = (
+                ma.fields.Raw()
+                if index_dtype is None
+                else _dtype_to_field(index_dtype)
+            )
+
+            fields["index"] = ma.fields.List(index_field, required=True)
+
+            fields["columns"] = ma.fields.List(
+                ma.fields.String,
+                required=True,
+                validate=ma.validate.Equal(dtypes.columns),
+            )
+
+            return fields
+
+        return dict_cls()
+
+
+class RecordsDataFrameSchema(ma.Schema, metaclass=RecordsDataFrameSchemaMeta):
     """Schema to generate pandas DataFrame from list of records"""
-
-    # Configuration attributes, should be implemented by subclasses
-    dtypes: Union[Dtypes, pd.DataFrame]
-
-    def __init__(self, *args, **kwargs):
-
-        self._dtypes = _validate_dtypes_attribute(self)
-
-        # create marshmallow fields
-        input_fields = {
-            k: _dtype_to_field(v)
-            for k, v in zip(self._dtypes.columns, self._dtypes.dtypes)
-        }
-
-        # create schema dynamically
-        RecordSchema = type("RecordSchema", (ma.Schema,), input_fields)
-
-        df_fields: Dict[str, ma.fields.Field] = {
-            "data": fields.Nested(RecordSchema, many=True, required=True)
-        }
-
-        self._declared_fields.update(df_fields)
-
-        super().__init__(*args, **kwargs)
-
-    class Meta:
-        strict = True
 
     @ma.post_load
     def make_df(self, data: dict) -> pd.DataFrame:
@@ -121,43 +198,6 @@ class RecordsDataFrameSchema(ma.Schema):
 
 class SplitDataFrameSchema(ma.Schema):
     """Schema to generate pandas DataFrame from split oriented JSON"""
-
-    # Configuration attributes, should be implemented by subclasses
-    dtypes: Union[Dtypes, pd.DataFrame]
-    index_dtype: Optional[np.dtype] = None
-
-    def __init__(self, *args, **kwargs):
-        self._dtypes = _validate_dtypes_attribute(self)
-
-        df_fields: Dict[str, ma.fields.Field] = {}
-
-        data_tuple_fields = [
-            _dtype_to_field(dtype) for dtype in self._dtypes.dtypes
-        ]
-        df_fields["data"] = ma.fields.List(
-            ma.fields.Tuple(data_tuple_fields), required=True
-        )
-
-        index_field = (
-            ma.fields.Raw()
-            if self.index_dtype is None
-            else _dtype_to_field(self.index_dtype)
-        )
-
-        df_fields["index"] = ma.fields.List(index_field, required=True)
-
-        df_fields["columns"] = ma.fields.List(
-            ma.fields.String,
-            required=True,
-            validate=ma.validate.Equal(self._dtypes.columns),
-        )
-
-        self._declared_fields.update(df_fields)
-
-        super().__init__(*args, **kwargs)
-
-    class Meta:
-        strict = True
 
     @ma.validates_schema(skip_on_field_errors=True)
     def validate_index_data_length(self, data: dict) -> None:
