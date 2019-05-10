@@ -1,8 +1,8 @@
 # marshmallow-dataframe
 
-[![Build Status](https://travis-ci.org/zblz/marshmallow-dataframe.svg?branch=master)](https://travis-ci.org/zblz/marshmallow-dataframe)
+[![Build Status](https://travis-ci.org/facultyai/marshmallow-dataframe.svg?branch=master)](https://travis-ci.org/facultyai/marshmallow-dataframe)
 [![PyPI](https://img.shields.io/pypi/v/marshmallow-dataframe.svg)](https://pypi.org/project/marshmallow-dataframe/)
-[![License](https://img.shields.io/github/license/zblz/marshmallow-dataframe.svg)](https://github.com/zblz/marshmallow-dataframe/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/facultyai/marshmallow-dataframe.svg)](https://github.com/facultyai/marshmallow-dataframe/blob/master/LICENSE)
 
 `marshmallow-dataframe` is a library that helps you generate
 [marshmallow](https://marshmallow.readthedocs.io/) Schemas for Pandas
@@ -77,7 +77,10 @@ invalid_animal = {
 animal_schema.load(invalid_animal)
 
 # Raises:
-# marshmallow.exceptions.ValidationError: {'columns': ["Must be equal to ['name', 'class', 'max_speed', 'num_legs']."], 'data': {0: {3: ['Not a valid integer.']}}}
+# marshmallow.exceptions.ValidationError: {
+#     'columns': ["Must be equal to ['name', 'class', 'max_speed', 'num_legs']."],
+#     'data': {0: {3: ['Not a valid integer.']}}
+# }
 ```
 
 `marshmallow_dataframe` can also generate Schemas for the `orient=records`
@@ -99,9 +102,9 @@ pip install marshmallow-dataframe
 Contributions are welcome!
 
 You can report a problem or feature request in the [issue
-tracker](https://github.com/zblz/marshmallow-dataframe/issues). If you feel that
-you can fix it or implement it, please submit a pull request referencing the
-issues it solves.
+tracker](https://github.com/facultyai/marshmallow-dataframe/issues). If you feel
+that you can fix it or implement it, please submit a pull request referencing
+the issues it solves.
 
 Unit tests written using the [`pytest`](https://pytest.org) framework are in the
 `tests` directory, and are run using
