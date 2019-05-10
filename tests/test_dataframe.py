@@ -54,6 +54,7 @@ def test_schema_no_dtypes(base_class):
     with pytest.raises(
         ValueError, match="must define the `dtypes` Meta option"
     ):
+
         class NewSchema(base_class):
             pass
 
@@ -63,6 +64,7 @@ def test_schema_no_dtypes(base_class):
 )
 def test_schema_wrong_dtypes(base_class):
     with pytest.raises(ValueError, match="must be either a pandas Series or"):
+
         class NewSchema(base_class):
             class Meta:
                 dtypes = "wrong type for dtypes"
