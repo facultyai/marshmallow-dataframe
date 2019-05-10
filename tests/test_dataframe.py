@@ -49,6 +49,18 @@ def serialize_df(df, orient="split"):
 @pytest.mark.parametrize(
     "base_class", [SplitDataFrameSchema, RecordsDataFrameSchema]
 )
+def test_schema_no_dtypes(base_class):
+
+    with pytest.raises(
+        ValueError, match="must define the `dtypes` Meta option"
+    ):
+        class NewSchema(base_class):
+            pass
+
+
+@pytest.mark.parametrize(
+    "base_class", [SplitDataFrameSchema, RecordsDataFrameSchema]
+)
 def test_schema_wrong_dtypes(base_class):
     with pytest.raises(ValueError, match="must be either a pandas Series or"):
         class NewSchema(base_class):

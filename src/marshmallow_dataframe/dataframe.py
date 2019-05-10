@@ -89,6 +89,18 @@ class DataFrameSchemaOpts(ma.SchemaOpts):
 class DataFrameSchemaMeta(ma.schema.SchemaMeta):
     """Base metaclass for DataFrame schemas"""
 
+    def __new__(meta, name, bases, class_dict):
+        """Only validate subclasses of our schemas"""
+        klass = super().__new__(meta, name, bases, class_dict)
+
+        if bases != (ma.Schema,) and klass.opts.dtypes is None:
+            raise ValueError(
+                "Subclasses of marshmallow_dataframe Schemas must define "
+                "the `dtypes` Meta option"
+            )
+
+        return klass
+
     @classmethod
     def get_declared_fields(
         mcs, klass, cls_fields, inherited_fields, dict_cls
