@@ -1,13 +1,6 @@
 import pandas as pd
 import numpy as np
-from marshmallow import (
-    fields,
-    Schema,
-    post_load,
-    validate,
-    ValidationError,
-    validates_schema,
-)
+import marshmallow as ma
 from typing import NamedTuple, List, Union, Optional, Dict
 
 __all__ = ["Dtypes", "RecordsDataFrameSchema", "SplitDataFrameSchema"]
@@ -17,13 +10,13 @@ _FIELD_OPTIONS = {"required": True, "allow_none": True}
 # Integer columns in pandas cannot have null values, so here we allow_none for
 # all types except int
 DTYPE_KIND_TO_FIELD = {
-    "i": fields.Int(required=True),
-    "u": fields.Int(**_FIELD_OPTIONS),
-    "f": fields.Float(allow_nan=True, **_FIELD_OPTIONS),
-    "O": fields.Str(**_FIELD_OPTIONS),
-    "b": fields.Bool(**_FIELD_OPTIONS),
-    "M": fields.DateTime(**_FIELD_OPTIONS),
-    "m": fields.TimeDelta(**_FIELD_OPTIONS),
+    "i": ma.fields.Int(required=True),
+    "u": ma.fields.Int(**_FIELD_OPTIONS),
+    "f": ma.fields.Float(allow_nan=True, **_FIELD_OPTIONS),
+    "O": ma.fields.Str(**_FIELD_OPTIONS),
+    "b": ma.fields.Bool(**_FIELD_OPTIONS),
+    "M": ma.fields.DateTime(**_FIELD_OPTIONS),
+    "m": ma.fields.TimeDelta(**_FIELD_OPTIONS),
 }
 
 
@@ -45,7 +38,7 @@ class DtypeToFieldConversionError(Exception):
     pass
 
 
-def _dtype_to_field(dtype: np.dtype) -> fields.Field:
+def _dtype_to_field(dtype: np.dtype) -> ma.fields.Field:
     try:
         kind = dtype.kind
     except AttributeError as exc:
@@ -64,7 +57,7 @@ def _dtype_to_field(dtype: np.dtype) -> fields.Field:
         ) from exc
 
 
-def _validate_dtypes_attribute(schema: Schema) -> Dtypes:
+def _validate_dtypes_attribute(schema: ma.Schema) -> Dtypes:
     try:
         dtypes = schema.dtypes
     except AttributeError as exc:
@@ -85,7 +78,7 @@ def _validate_dtypes_attribute(schema: Schema) -> Dtypes:
     return dtypes
 
 
-class RecordsDataFrameSchema(Schema):
+class RecordsDataFrameSchema(ma.Schema):
     """Schema to generate pandas DataFrame from list of records"""
 
     # Configuration attributes, should be implemented by subclasses
@@ -102,9 +95,9 @@ class RecordsDataFrameSchema(Schema):
         }
 
         # create schema dynamically
-        RecordSchema = type("RecordSchema", (Schema,), input_fields)
+        RecordSchema = type("RecordSchema", (ma.Schema,), input_fields)
 
-        df_fields: Dict[str, fields.Field] = {
+        df_fields: Dict[str, ma.fields.Field] = {
             "data": fields.Nested(RecordSchema, many=True, required=True)
         }
 
@@ -115,7 +108,7 @@ class RecordsDataFrameSchema(Schema):
     class Meta:
         strict = True
 
-    @post_load
+    @ma.post_load
     def make_df(self, data: dict) -> pd.DataFrame:
         records_data = data["data"]
         index_data = {i: row for i, row in enumerate(records_data)}
@@ -126,7 +119,7 @@ class RecordsDataFrameSchema(Schema):
         )
 
 
-class SplitDataFrameSchema(Schema):
+class SplitDataFrameSchema(ma.Schema):
     """Schema to generate pandas DataFrame from split oriented JSON"""
 
     # Configuration attributes, should be implemented by subclasses
@@ -136,27 +129,27 @@ class SplitDataFrameSchema(Schema):
     def __init__(self, *args, **kwargs):
         self._dtypes = _validate_dtypes_attribute(self)
 
-        df_fields: Dict[str, fields.Field] = {}
+        df_fields: Dict[str, ma.fields.Field] = {}
 
         data_tuple_fields = [
             _dtype_to_field(dtype) for dtype in self._dtypes.dtypes
         ]
-        df_fields["data"] = fields.List(
-            fields.Tuple(data_tuple_fields), required=True
+        df_fields["data"] = ma.fields.List(
+            ma.fields.Tuple(data_tuple_fields), required=True
         )
 
         index_field = (
-            fields.Raw()
+            ma.fields.Raw()
             if self.index_dtype is None
             else _dtype_to_field(self.index_dtype)
         )
 
-        df_fields["index"] = fields.List(index_field, required=True)
+        df_fields["index"] = ma.fields.List(index_field, required=True)
 
-        df_fields["columns"] = fields.List(
-            fields.String,
+        df_fields["columns"] = ma.fields.List(
+            ma.fields.String,
             required=True,
-            validate=validate.Equal(self._dtypes.columns),
+            validate=ma.validate.Equal(self._dtypes.columns),
         )
 
         self._declared_fields.update(df_fields)
@@ -166,13 +159,13 @@ class SplitDataFrameSchema(Schema):
     class Meta:
         strict = True
 
-    @validates_schema(skip_on_field_errors=True)
+    @ma.validates_schema(skip_on_field_errors=True)
     def validate_index_data_length(self, data: dict) -> None:
         if len(data["index"]) != len(data["data"]):
-            raise ValidationError(
+            raise ma.ValidationError(
                 "Length of `index` and `data` must be equal.", "data"
             )
 
-    @post_load
+    @ma.post_load
     def make_df(self, data: dict) -> pd.DataFrame:
         return pd.DataFrame(dtype=None, **data)
