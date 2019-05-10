@@ -121,7 +121,7 @@ class RecordsDataFrameSchemaMeta(DataFrameSchemaMeta):
         mcs, opts: DataFrameSchemaOpts, dict_cls
     ) -> Dict[str, ma.fields.Field]:
 
-        if opts.dtypes is not None and opts.index_dtype is not None:
+        if opts.dtypes is not None:
             dtypes = _validate_dtypes(opts.dtypes)
 
             # create marshmallow fields
@@ -150,7 +150,7 @@ class SplitDataFrameSchemaMeta(DataFrameSchemaMeta):
         mcs, opts: DataFrameSchemaOpts, dict_cls
     ) -> Dict[str, ma.fields.Field]:
 
-        if opts.dtypes is not None and opts.index_dtype is not None:
+        if opts.dtypes is not None:
             dtypes = _validate_dtypes(opts.dtypes)
             index_dtype = opts.index_dtype
 
@@ -185,6 +185,8 @@ class SplitDataFrameSchemaMeta(DataFrameSchemaMeta):
 class RecordsDataFrameSchema(ma.Schema, metaclass=RecordsDataFrameSchemaMeta):
     """Schema to generate pandas DataFrame from list of records"""
 
+    OPTIONS_CLASS = DataFrameSchemaOpts
+
     @ma.post_load
     def make_df(self, data: dict) -> pd.DataFrame:
         records_data = data["data"]
@@ -196,8 +198,10 @@ class RecordsDataFrameSchema(ma.Schema, metaclass=RecordsDataFrameSchemaMeta):
         )
 
 
-class SplitDataFrameSchema(ma.Schema):
+class SplitDataFrameSchema(ma.Schema, metaclass=SplitDataFrameSchemaMeta):
     """Schema to generate pandas DataFrame from split oriented JSON"""
+
+    OPTIONS_CLASS = DataFrameSchemaOpts
 
     @ma.validates_schema(skip_on_field_errors=True)
     def validate_index_data_length(self, data: dict) -> None:

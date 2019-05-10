@@ -64,7 +64,8 @@ def test_schema_no_dtypes(base_class):
 )
 def test_schema_wrong_dtypes(base_class):
     class NewSchema(base_class):
-        dtypes = "wrong type for dtypes"
+        class Meta:
+            dtypes = "wrong type for dtypes"
 
     with pytest.raises(ValueError, match="must be either a pandas Series or"):
         NewSchema()
@@ -72,9 +73,12 @@ def test_schema_wrong_dtypes(base_class):
 
 def test_records_schema(sample_df):
     class MySchema(RecordsDataFrameSchema):
-        dtypes = sample_df.dtypes
+        class Meta:
+            dtypes = sample_df.dtypes
 
     schema = MySchema()
+
+    print(schema._declared_fields)
 
     output = schema.load(serialize_df(sample_df, orient="records"))
 
@@ -244,8 +248,9 @@ def test_records_schema_missing_data_field():
 @pytest.fixture
 def split_sample_schema(sample_df):
     class MySchema(SplitDataFrameSchema):
-        dtypes = sample_df.dtypes
-        index_dtype = sample_df.index.dtype
+        class Meta:
+            dtypes = sample_df.dtypes
+            index_dtype = sample_df.index.dtype
 
     return MySchema()
 
@@ -305,8 +310,9 @@ def test_split_schema_hypothesis(test_df):
         return
 
     class MySchema(SplitDataFrameSchema):
-        dtypes = test_df.dtypes
-        index_dtype = test_df.index.dtype
+        class Meta:
+            dtypes = test_df.dtypes
+            index_dtype = test_df.index.dtype
 
     schema = MySchema()
 
@@ -332,8 +338,9 @@ def test_split_schema_str_index(sample_df):
     test_df.index = test_df.index.astype(str)
 
     class MySchema(SplitDataFrameSchema):
-        dtypes = test_df.dtypes
-        index_dtype = test_df.index.dtype
+        class Meta:
+            dtypes = test_df.dtypes
+            index_dtype = test_df.index.dtype
 
     schema = MySchema()
 
