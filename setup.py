@@ -9,13 +9,13 @@ with open(
 
 setup(
     name="marshmallow-dataframe",
-    description="Marshmallow Schema generator for pandas and numpy",
+    description="Marshmallow Schema generator for pandas dataframes",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    license="MIT",
-    url="https://github.com/zblz/marshmallow-dataframe",
-    author="Víctor Zabalza",
-    author_email="vzabalza@gmail.com",
+    license="Apache Software License",
+    url="https://github.com/facultyai/marshmallow-dataframe",
+    author="Faculty",
+    author_email="opensource@faculty.ai",
     packages=find_packages("src"),
     package_dir={"": "src"},
     use_scm_version={
