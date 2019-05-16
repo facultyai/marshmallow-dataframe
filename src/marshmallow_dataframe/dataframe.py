@@ -1,22 +1,36 @@
+from collections import defaultdict
+
 import pandas as pd
+from pandas.core.dtypes.api import is_categorical_dtype
 import numpy as np
 import marshmallow as ma
 from typing import NamedTuple, List, Union, Dict
 
 __all__ = ["Dtypes", "RecordsDataFrameSchema", "SplitDataFrameSchema"]
 
-_FIELD_OPTIONS = {"required": True, "allow_none": True}
+DTYPE_KIND_TO_FIELD_CLASS = {
+    "i": ma.fields.Int,
+    "u": ma.fields.Int,
+    "f": ma.fields.Float,
+    "O": ma.fields.Str,
+    "U": ma.fields.Str,
+    "S": ma.fields.Str,
+    "b": ma.fields.Bool,
+    "M": ma.fields.DateTime,
+    "m": ma.fields.TimeDelta,
+}
 
-# Integer columns in pandas cannot have null values, so here we allow_none for
-# all types except int
-DTYPE_KIND_TO_FIELD = {
-    "i": ma.fields.Int(required=True),
-    "u": ma.fields.Int(**_FIELD_OPTIONS),
-    "f": ma.fields.Float(allow_nan=True, **_FIELD_OPTIONS),
-    "O": ma.fields.Str(**_FIELD_OPTIONS),
-    "b": ma.fields.Bool(**_FIELD_OPTIONS),
-    "M": ma.fields.DateTime(**_FIELD_OPTIONS),
-    "m": ma.fields.TimeDelta(**_FIELD_OPTIONS),
+_DEFAULT_FIELD_OPTIONS = {"required": True, "allow_none": True}
+
+DTYPE_KIND_TO_FIELD_OPTIONS: Dict[str, Dict[str, bool]] = defaultdict(
+    lambda: _DEFAULT_FIELD_OPTIONS
+)
+# Integer columns in pandas cannot have null values, so we allow_none for all
+# types except int
+DTYPE_KIND_TO_FIELD_OPTIONS["i"] = {"required": True}
+DTYPE_KIND_TO_FIELD_OPTIONS["f"] = {
+    "allow_nan": True,
+    **_DEFAULT_FIELD_OPTIONS,
 }
 
 
@@ -25,7 +39,7 @@ class Dtypes(NamedTuple):
     dtypes: List[np.dtype]
 
     @classmethod
-    def from_pandas_dtypes(cls, pd_dtypes: pd.DataFrame) -> "Dtypes":
+    def from_pandas_dtypes(cls, pd_dtypes: pd.Series) -> "Dtypes":
         return cls(
             columns=list(pd_dtypes.index), dtypes=list(pd_dtypes.values)
         )
@@ -39,6 +53,16 @@ class DtypeToFieldConversionError(Exception):
 
 
 def _dtype_to_field(dtype: np.dtype) -> ma.fields.Field:
+    # Object dtypes require more detailed mapping
+    if is_categorical_dtype(dtype):
+        categories = dtype.categories.values.tolist()
+        kind = dtype.categories.dtype.kind
+        field_class = DTYPE_KIND_TO_FIELD_CLASS[kind]
+        field_options = DTYPE_KIND_TO_FIELD_OPTIONS[kind]
+        return field_class(
+            validate=ma.validate.OneOf(categories), **field_options
+        )
+
     try:
         kind = dtype.kind
     except AttributeError as exc:
@@ -48,12 +72,14 @@ def _dtype_to_field(dtype: np.dtype) -> ma.fields.Field:
         ) from exc
 
     try:
-        return DTYPE_KIND_TO_FIELD[kind]
+        field_class = DTYPE_KIND_TO_FIELD_CLASS[kind]
+        field_options = DTYPE_KIND_TO_FIELD_OPTIONS[kind]
+        return field_class(**field_options)
     except KeyError as exc:
         raise DtypeToFieldConversionError(
             f"The conversion of the dtype {dtype} with kind {dtype.kind} "
             "into marshmallow fields is unknown. Known kinds are: "
-            f"{DTYPE_KIND_TO_FIELD.keys()}"
+            f"{DTYPE_KIND_TO_FIELD_CLASS.keys()}"
         ) from exc
 
 
@@ -205,14 +231,7 @@ class RecordsDataFrameSchema(ma.Schema, metaclass=RecordsDataFrameSchemaMeta):
         index_data = {i: row for i, row in enumerate(records_data)}
         return pd.DataFrame.from_dict(
             index_data, orient="index", columns=self.opts.dtypes.columns
-        ).astype(
-            {
-                k: v
-                for k, v in zip(
-                    self.opts.dtypes.columns, self.opts.dtypes.dtypes
-                )
-            }
-        )
+        ).astype(dict(zip(self.opts.dtypes.columns, self.opts.dtypes.dtypes)))
 
 
 class SplitDataFrameSchema(ma.Schema, metaclass=SplitDataFrameSchemaMeta):
@@ -229,4 +248,8 @@ class SplitDataFrameSchema(ma.Schema, metaclass=SplitDataFrameSchemaMeta):
 
     @ma.post_load
     def make_df(self, data: dict) -> pd.DataFrame:
-        return pd.DataFrame(dtype=None, **data)
+        df = pd.DataFrame(dtype=None, **data).astype(
+            dict(zip(self.opts.dtypes.columns, self.opts.dtypes.dtypes))
+        )
+
+        return df
