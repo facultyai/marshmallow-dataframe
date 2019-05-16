@@ -1,7 +1,6 @@
 from collections import defaultdict
 
 import pandas as pd
-from pandas.core.dtypes.api import is_categorical_dtype
 import numpy as np
 import marshmallow as ma
 from typing import NamedTuple, List, Union, Dict
@@ -54,7 +53,7 @@ class DtypeToFieldConversionError(Exception):
 
 def _dtype_to_field(dtype: np.dtype) -> ma.fields.Field:
     # Object dtypes require more detailed mapping
-    if is_categorical_dtype(dtype):
+    if pd.api.types.is_categorical_dtype(dtype):
         categories = dtype.categories.values.tolist()
         kind = dtype.categories.dtype.kind
         field_class = DTYPE_KIND_TO_FIELD_CLASS[kind]
