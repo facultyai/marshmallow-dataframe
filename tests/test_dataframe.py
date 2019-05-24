@@ -257,6 +257,31 @@ def test_records_schema_missing_data_field():
     )
 
 
+@pytest.mark.parametrize(
+    "column,data",
+    (["categorical_int", [0, 10]], ["categorical_str", ["one", "ten"]]),
+)
+def test_records_schema_wrong_category(sample_df, column, data):
+    class MySchema(RecordsDataFrameSchema):
+        class Meta:
+            dtypes = sample_df.dtypes
+
+    schema = MySchema()
+
+    # Replace categorical column data
+    new_df = sample_df.copy()
+    new_df[column] = data
+
+    input_df = serialize_df(new_df, orient="records")
+
+    with pytest.raises(ValidationError) as exception:
+        schema.load(input_df)
+
+    assert exception.value.messages["data"][1][column][0].startswith(
+        "Must be one of"
+    )
+
+
 @pytest.fixture
 def split_sample_schema(sample_df):
     class MySchema(SplitDataFrameSchema):
@@ -433,4 +458,27 @@ def test_split_schema_index_data_length_mismatch(
     assert (
         exc.value.messages["data"][0]
         == f"Length of `index` and `data` must be equal."
+    )
+
+
+@pytest.mark.parametrize(
+    "column,data",
+    (["categorical_int", [0, 10]], ["categorical_str", ["one", "ten"]]),
+)
+def test_split_schema_wrong_category(
+    split_sample_schema, sample_df, column, data
+):
+    # Replace categorical column data
+    new_df = sample_df.copy()
+    new_df[column] = data
+
+    column_index = list(new_df.columns).index(column)
+
+    input_df = serialize_df(new_df, orient="split")
+
+    with pytest.raises(ValidationError) as exception:
+        split_sample_schema.load(input_df)
+
+    assert exception.value.messages["data"][1][column_index][0].startswith(
+        "Must be one of"
     )
