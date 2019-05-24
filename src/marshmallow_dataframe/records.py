@@ -2,7 +2,7 @@ import pandas as pd
 import marshmallow as ma
 from typing import Dict
 
-from converters import dtype_to_field
+from .converters import dtype_to_field
 from .base import DataFrameSchemaOpts, DataFrameSchemaMeta
 
 
