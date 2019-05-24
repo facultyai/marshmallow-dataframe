@@ -1,9 +1,9 @@
 from collections import defaultdict
+from typing import Dict
 
+import marshmallow as ma
 import numpy as np
 import pandas as pd
-import marshmallow as ma
-from typing import Dict
 
 DTYPE_KIND_TO_FIELD_CLASS = {
     "i": ma.fields.Int,

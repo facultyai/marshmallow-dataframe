@@ -1,7 +1,8 @@
-import pandas as pd
-import numpy as np
+from typing import Dict, List, NamedTuple, Union
+
 import marshmallow as ma
-from typing import NamedTuple, List, Union, Dict
+import numpy as np
+import pandas as pd
 
 
 class Dtypes(NamedTuple):

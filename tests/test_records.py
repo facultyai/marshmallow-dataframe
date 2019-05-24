@@ -1,13 +1,12 @@
+import hypothesis
+import hypothesis.strategies as st
 import numpy as np
 import pandas as pd
 import pytest
-import hypothesis
-import hypothesis.strategies as st
+from hypothesis.extra.pandas import column, data_frames, indexes
 from marshmallow import ValidationError
-from pandas.util.testing import assert_frame_equal
-from hypothesis.extra.pandas import data_frames, column, indexes
-
 from marshmallow_dataframe import Dtypes, RecordsDataFrameSchema
+from pandas.util.testing import assert_frame_equal
 
 from .utils import serialize_df
 

@@ -1,9 +1,10 @@
-import pandas as pd
-import marshmallow as ma
 from typing import Dict
 
+import marshmallow as ma
+import pandas as pd
+
+from .base import DataFrameSchemaMeta, DataFrameSchemaOpts
 from .converters import dtype_to_field
-from .base import DataFrameSchemaOpts, DataFrameSchemaMeta
 
 
 class RecordsDataFrameSchemaMeta(DataFrameSchemaMeta):
