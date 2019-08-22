@@ -50,14 +50,14 @@ class SplitDataFrameSchema(ma.Schema, metaclass=SplitDataFrameSchemaMeta):
     OPTIONS_CLASS = DataFrameSchemaOpts
 
     @ma.validates_schema(skip_on_field_errors=True)
-    def validate_index_data_length(self, data: dict) -> None:
+    def validate_index_data_length(self, data: dict, **kwargs) -> None:
         if len(data["index"]) != len(data["data"]):
             raise ma.ValidationError(
                 "Length of `index` and `data` must be equal.", "data"
             )
 
     @ma.post_load
-    def make_df(self, data: dict) -> pd.DataFrame:
+    def make_df(self, data: dict, **kwargs) -> pd.DataFrame:
         df = pd.DataFrame(dtype=None, **data).astype(
             dict(zip(self.opts.dtypes.columns, self.opts.dtypes.dtypes))
         )

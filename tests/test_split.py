@@ -46,13 +46,13 @@ def split_serialized_df(sample_df):
 def test_split_schema(sample_df, split_sample_schema, split_serialized_df):
 
     assert isinstance(
-        split_sample_schema.fields["data"].container, fields.Tuple
+        split_sample_schema.fields["data"].inner, fields.Tuple
     )
     assert isinstance(
-        split_sample_schema.fields["columns"].container, fields.String
+        split_sample_schema.fields["columns"].inner, fields.String
     )
     assert isinstance(
-        split_sample_schema.fields["index"].container, fields.Integer
+        split_sample_schema.fields["index"].inner, fields.Integer
     )
 
     output = split_sample_schema.load(split_serialized_df)
@@ -127,7 +127,7 @@ def test_split_schema_str_index(sample_df):
 
     schema = MySchema()
 
-    assert isinstance(schema.fields["index"].container, fields.String)
+    assert isinstance(schema.fields["index"].inner, fields.String)
 
     result = schema.load(serialize_df(test_df, orient="split"))
 
