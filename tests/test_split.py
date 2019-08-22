@@ -45,9 +45,7 @@ def split_serialized_df(sample_df):
 
 def test_split_schema(sample_df, split_sample_schema, split_serialized_df):
 
-    assert isinstance(
-        split_sample_schema.fields["data"].inner, fields.Tuple
-    )
+    assert isinstance(split_sample_schema.fields["data"].inner, fields.Tuple)
     assert isinstance(
         split_sample_schema.fields["columns"].inner, fields.String
     )
