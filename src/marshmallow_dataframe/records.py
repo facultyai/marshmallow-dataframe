@@ -41,7 +41,7 @@ class RecordsDataFrameSchema(ma.Schema, metaclass=RecordsDataFrameSchemaMeta):
     OPTIONS_CLASS = DataFrameSchemaOpts
 
     @ma.post_load
-    def make_df(self, data: dict) -> pd.DataFrame:
+    def make_df(self, data: dict, **kwargs) -> pd.DataFrame:
         records_data = data["data"]
         index_data = {i: row for i, row in enumerate(records_data)}
         return pd.DataFrame.from_dict(
