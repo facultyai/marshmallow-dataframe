@@ -55,9 +55,8 @@ class SplitDataFrameSchema(ma.Schema, metaclass=SplitDataFrameSchemaMeta):
 
     @ma.validates_schema(skip_on_field_errors=True)
     def validate_index_data_length(self, data: dict, **kwargs) -> None:
-        if (
-                data.get("index") is not None and
-                len(data["index"]) != len(data["data"])
+        if data.get("index") is not None and len(data["index"]) != len(
+            data["data"]
         ):
             raise ma.ValidationError(
                 "Length of `index` and `data` must be equal.", "data"
