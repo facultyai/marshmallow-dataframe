@@ -114,6 +114,23 @@ def test_split_schema_missing_top_level_key(
     assert exc.value.messages[key] == ["Missing data for required field."]
 
 
+@pytest.mark.parametrize("require_index", [True, False])
+def test_optional_index_field(sample_df, require_index):
+    class MySchema(SplitDataFrameSchema):
+        class Meta:
+            dtypes = sample_df.dtypes
+            index_dtype = sample_df.index.dtype if require_index else None
+
+    serialized_df = serialize_df(sample_df, orient="split")
+
+    if not require_index:
+        del serialized_df["index"]
+
+    output = MySchema().load(serialized_df)
+
+    assert_frame_equal(output, sample_df)
+
+
 def test_split_schema_str_index(sample_df):
     test_df = sample_df.copy()
     test_df.index = test_df.index.astype(str)

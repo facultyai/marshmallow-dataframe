@@ -31,7 +31,11 @@ class SplitDataFrameSchemaMeta(DataFrameSchemaMeta):
                 else dtype_to_field(index_dtype)
             )
 
-            fields["index"] = ma.fields.List(index_field, required=True)
+            index_required = False if index_dtype is None else True
+
+            fields["index"] = ma.fields.List(
+                index_field, required=index_required
+            )
 
             fields["columns"] = ma.fields.List(
                 ma.fields.String,
@@ -51,7 +55,10 @@ class SplitDataFrameSchema(ma.Schema, metaclass=SplitDataFrameSchemaMeta):
 
     @ma.validates_schema(skip_on_field_errors=True)
     def validate_index_data_length(self, data: dict, **kwargs) -> None:
-        if len(data["index"]) != len(data["data"]):
+        if (
+                data.get("index") is not None and
+                len(data["index"]) != len(data["data"])
+        ):
             raise ma.ValidationError(
                 "Length of `index` and `data` must be equal.", "data"
             )
