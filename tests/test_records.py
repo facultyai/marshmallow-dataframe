@@ -5,8 +5,9 @@ import pandas as pd
 import pytest
 from hypothesis.extra.pandas import column, data_frames, indexes
 from marshmallow import ValidationError
-from marshmallow_dataframe import Dtypes, RecordsDataFrameSchema
 from pandas.util.testing import assert_frame_equal
+
+from marshmallow_dataframe import Dtypes, RecordsDataFrameSchema
 
 from .utils import serialize_df
 

@@ -5,8 +5,9 @@ import pandas as pd
 import pytest
 from hypothesis.extra.pandas import column, data_frames, indexes
 from marshmallow import ValidationError, fields
-from marshmallow_dataframe import SplitDataFrameSchema
 from pandas.util.testing import assert_frame_equal
+
+from marshmallow_dataframe import SplitDataFrameSchema
 
 from .utils import serialize_df
 
@@ -203,7 +204,7 @@ def test_split_schema_wrong_type_in_data(
     with pytest.raises(ValidationError) as exc:
         split_sample_schema.load(split_serialized_df)
 
-    assert exc.value.messages["data"][0][0][0] == f"Not a valid integer."
+    assert exc.value.messages["data"][0][0][0] == "Not a valid integer."
 
 
 @pytest.mark.parametrize("key", ["index", "data"])
@@ -218,7 +219,7 @@ def test_split_schema_index_data_length_mismatch(
 
     assert (
         exc.value.messages["data"][0]
-        == f"Length of `index` and `data` must be equal."
+        == "Length of `index` and `data` must be equal."
     )
 
 
