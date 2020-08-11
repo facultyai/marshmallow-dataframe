@@ -1,6 +1,6 @@
 # marshmallow-dataframe
 
-[![Build Status](https://travis-ci.org/facultyai/marshmallow-dataframe.svg?branch=master)](https://travis-ci.org/facultyai/marshmallow-dataframe)
+[![Build Status](https://github.com/facultyai/marshmallow-dataframe/workflows/Tests/badge.svg)](https://github.com/facultyai/marshmallow-dataframe/actions?query=workflow%3ATests)
 [![PyPI](https://img.shields.io/pypi/v/marshmallow-dataframe.svg)](https://pypi.org/project/marshmallow-dataframe/)
 [![License](https://img.shields.io/github/license/facultyai/marshmallow-dataframe.svg)](https://github.com/facultyai/marshmallow-dataframe/blob/master/LICENSE)
 
